@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# runtime-generated booking previews
+/public/previews/
+
+# large media (host via CDN / Git LFS for deploy)
+/public/hero.mp4
