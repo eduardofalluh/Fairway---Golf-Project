@@ -21,6 +21,21 @@ type SortKey =
   | "closest-price"
   | "distance";
 
+/** The full set of search inputs — used to override form state for AI search. */
+type SearchValues = {
+  date: string;
+  time: string;
+  windowMinutes: number;
+  players: number;
+  holes: "any" | "9" | "18";
+  useTarget: boolean;
+  targetPrice: number;
+  maxPrice: number;
+  regions: Region[];
+  publicOnly: boolean;
+  sort: SortKey;
+};
+
 const SORTS: { key: SortKey; label: string }[] = [
   { key: "price-desc", label: "Price: high → low" },
   { key: "price-asc", label: "Price: low → high" },
@@ -50,22 +65,40 @@ export function TeeFinder() {
   const { profile, save, clear } = useProfile();
   const [bookingTee, setBookingTee] = useState<TeeTimeResult | null>(null);
 
+  // AI natural-language search
+  const [aiText, setAiText] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const runSearch = useCallback(
-    async (scroll = false) => {
+    async (scroll = false, ov?: Partial<SearchValues>) => {
       setLoading(true);
       setError(null);
+      const v = {
+        date: ov?.date ?? date,
+        time: ov?.time ?? time,
+        windowMinutes: ov?.windowMinutes ?? windowMinutes,
+        players: ov?.players ?? players,
+        holes: ov?.holes ?? holes,
+        useTarget: ov?.useTarget ?? useTarget,
+        targetPrice: ov?.targetPrice ?? targetPrice,
+        maxPrice: ov?.maxPrice ?? maxPrice,
+        regions: ov?.regions ?? regions,
+        publicOnly: ov?.publicOnly ?? publicOnly,
+        sort: ov?.sort ?? sort,
+      };
       const params = new URLSearchParams({
-        date,
-        time,
-        window: String(windowMinutes),
-        players: String(players),
-        holes,
-        max: String(maxPrice),
-        sort,
+        date: v.date,
+        time: v.time,
+        window: String(v.windowMinutes),
+        players: String(v.players),
+        holes: v.holes,
+        max: String(v.maxPrice),
+        sort: v.sort,
       });
-      if (useTarget) params.set("target", String(targetPrice));
-      if (regions.length) params.set("regions", regions.join(","));
-      if (publicOnly) params.set("public", "1");
+      if (v.useTarget) params.set("target", String(v.targetPrice));
+      if (v.regions.length) params.set("regions", v.regions.join(","));
+      if (v.publicOnly) params.set("public", "1");
 
       try {
         const res = await fetch(`/api/tee-times?${params.toString()}`);
@@ -98,6 +131,41 @@ export function TeeFinder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort]);
 
+  const runAiSearch = useCallback(async () => {
+    const q = aiText.trim();
+    if (!q) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q, today: todayISO() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "AI search failed");
+      const v = json.query as SearchValues;
+      // Reflect the parsed query in the form controls…
+      setDate(v.date);
+      setTime(v.time);
+      setWindowMinutes(v.windowMinutes);
+      setPlayers(v.players);
+      setHoles(v.holes);
+      setUseTarget(v.useTarget);
+      setTargetPrice(v.targetPrice);
+      setMaxPrice(v.maxPrice);
+      setRegions(v.regions);
+      setPublicOnly(v.publicOnly);
+      setSort(v.sort);
+      // …and run the search immediately with those values.
+      runSearch(true, v);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI search failed");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiText, runSearch]);
+
   const toggleRegion = (r: Region) =>
     setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
@@ -113,6 +181,41 @@ export function TeeFinder() {
         <p className="mx-auto mt-4 max-w-xl text-fog">
           We check every course in the region, then line up the slots that fit your
           window and budget.
+        </p>
+      </div>
+
+      {/* ── AI natural-language search ─────────────────────────────── */}
+      <div className="mb-6">
+        <div className="flex flex-col gap-3 rounded-3xl border border-lime/30 bg-gradient-to-br from-lime/[0.07] to-transparent p-4 sm:flex-row sm:items-center sm:p-5">
+          <div className="flex items-center gap-2 sm:flex-1">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-lime/15 text-lg">
+              ✨
+            </span>
+            <input
+              type="text"
+              value={aiText}
+              onChange={(e) => setAiText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") runAiSearch();
+              }}
+              placeholder="Ask in plain English — e.g. “cheap twilight 9 for 3 near Laval this weekend under $50”"
+              className="h-11 w-full rounded-xl border border-line bg-base-2 px-4 text-cream outline-none placeholder:text-fog/60 focus:border-lime"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={runAiSearch}
+            disabled={aiLoading || !aiText.trim()}
+            className="h-11 shrink-0 rounded-xl bg-lime px-6 font-display font-bold text-[#08160d] transition hover:brightness-105 disabled:opacity-50"
+          >
+            {aiLoading ? "Thinking…" : "Ask AI"}
+          </button>
+        </div>
+        {aiError && (
+          <p className="mt-2 text-sm text-red-300">{aiError}</p>
+        )}
+        <p className="mt-2 text-center text-xs text-fog sm:text-left">
+          AI fills the filters below and searches — tweak anything by hand after.
         </p>
       </div>
 
