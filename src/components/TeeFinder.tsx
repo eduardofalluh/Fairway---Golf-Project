@@ -102,7 +102,7 @@ export function TeeFinder() {
     setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
   return (
-    <section id="search" className="relative mx-auto max-w-6xl px-5 py-20 sm:py-28">
+    <section id="search" className="relative mx-auto max-w-[1600px] px-5 lg:px-10 py-20 sm:py-28">
       <div className="mb-10 text-center">
         <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-lime">
           The search
@@ -317,7 +317,15 @@ export function TeeFinder() {
           </div>
         )}
         {data && (
-          <div className="mt-10">
+          <div className={`mt-10 transition-opacity ${loading ? "pointer-events-none opacity-50" : ""}`} aria-busy={loading}>
+            {loading && (
+              <div className="pointer-events-none sticky top-24 z-20 mb-4 flex justify-center">
+                <span className="inline-flex items-center gap-2 rounded-full border border-lime/40 bg-base-2/90 px-4 py-2 text-sm font-semibold text-lime shadow-lg shadow-black/40 backdrop-blur">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-lime/30 border-t-lime" />
+                  Updating tee times…
+                </span>
+              </div>
+            )}
             <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h3 className="font-display text-2xl font-bold">

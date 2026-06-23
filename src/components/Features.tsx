@@ -51,7 +51,7 @@ const FEATURES: Feature[] = [
 
 export function Features() {
   return (
-    <section className="mx-auto max-w-6xl px-5 py-24">
+    <section className="mx-auto max-w-[1600px] px-5 lg:px-10 py-24">
       <Reveal>
         <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-lime">
           Why Fairway

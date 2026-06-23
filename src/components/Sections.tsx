@@ -27,7 +27,7 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section id="how" className="mx-auto max-w-6xl px-5 py-24">
+    <section id="how" className="mx-auto max-w-[1600px] px-5 lg:px-10 py-24">
       <Reveal>
         <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-lime">
           How it works
@@ -66,7 +66,7 @@ export function Stats({ courses }: { courses: GolfCourse[] }) {
   ];
   return (
     <section className="border-y border-line bg-base-2/40">
-      <RevealGroup className="mx-auto grid max-w-6xl grid-cols-2 gap-px px-5 md:grid-cols-4">
+      <RevealGroup className="mx-auto grid max-w-[1600px] grid-cols-2 gap-px px-5 md:grid-cols-4">
         {stats.map((s) => (
           <motion.div key={s.label} variants={revealItem} className="px-4 py-12 text-center">
             <div className="font-display text-4xl font-extrabold text-lime sm:text-5xl">
@@ -82,7 +82,7 @@ export function Stats({ courses }: { courses: GolfCourse[] }) {
 
 export function RegionsShowcase({ courses }: { courses: GolfCourse[] }) {
   return (
-    <section id="regions" className="mx-auto max-w-6xl px-5 py-24">
+    <section id="regions" className="mx-auto max-w-[1600px] px-5 lg:px-10 py-24">
       <Reveal>
         <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-lime">
           Coverage
@@ -129,7 +129,7 @@ export function RegionsShowcase({ courses }: { courses: GolfCourse[] }) {
 
 export function CtaBand() {
   return (
-    <section className="mx-auto max-w-6xl px-5 py-12">
+    <section className="mx-auto max-w-[1600px] px-5 lg:px-10 py-12">
       <Reveal className="relative overflow-hidden rounded-[2rem] border border-line">
         <Image
           src="/cta.jpg"
@@ -214,7 +214,7 @@ export function Faq() {
 export function Footer() {
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-10 text-sm text-fog sm:flex-row">
+      <div className="mx-auto flex max-w-[1600px] flex-col items-center justify-between gap-4 px-5 py-10 text-sm text-fog sm:flex-row">
         <div className="flex items-center gap-2 font-display font-bold text-cream">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-lime text-[#08160d]">
             ⛳

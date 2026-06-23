@@ -51,7 +51,7 @@ export function Hero({ courseCount }: { courseCount: number }) {
 
       <div className="pointer-events-none absolute inset-0 grid-lines opacity-40" />
 
-      <motion.div style={{ y, opacity, scale }} className="relative z-10 max-w-4xl">
+      <motion.div style={{ y, opacity, scale }} className="relative z-10 max-w-5xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

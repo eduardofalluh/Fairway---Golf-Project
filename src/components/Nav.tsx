@@ -20,7 +20,7 @@ export function Nav() {
           : "border-b border-transparent"
       }`}
     >
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+      <nav className="mx-auto flex max-w-[1600px] items-center justify-between px-5 py-4">
         <a href="#" className="flex items-center gap-2 font-display text-xl font-extrabold">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-lime text-[#08160d]">
             ⛳

@@ -34,7 +34,7 @@ const HEADERS = { Accept: "application/json", "User-Agent": UA };
 /** Disable all live Chronogolf calls (e.g. offline dev) with CHRONOGOLF_OFF=1. */
 const DISABLED = process.env.CHRONOGOLF_OFF === "1";
 /** Radius (km) of the directory pull around downtown Montréal. */
-const RADIUS_KM = Number(process.env.CHRONOGOLF_RADIUS_KM ?? 75);
+const RADIUS_KM = Number(process.env.CHRONOGOLF_RADIUS_KM ?? 100);
 
 interface SearchCourse {
   uuid: string;
