@@ -596,11 +596,22 @@ function ResultCard({
   onBook: () => void;
 }) {
   const near = target != null && Math.abs(r.price - target) <= 8;
+  const isLive = r.source === "live";
   return (
-    <div className="group flex flex-col gap-4 rounded-2xl border border-line bg-surface/60 p-5 transition hover:border-lime-soft/60 hover:bg-surface sm:flex-row sm:items-center">
+    <div
+      className={`group flex flex-col gap-4 rounded-2xl border p-5 transition hover:bg-surface sm:flex-row sm:items-center ${
+        isLive
+          ? "border-lime/30 bg-surface/70 hover:border-lime/60"
+          : "border-line bg-surface/40 hover:border-lime-soft/50"
+      }`}
+    >
       <div className="flex w-full items-center gap-4 sm:w-auto sm:flex-1">
-        <div className="flex h-14 w-16 flex-col items-center justify-center rounded-xl bg-base-2 text-center">
-          <span className="font-display text-lg font-bold leading-none text-cream">
+        <div
+          className={`flex h-14 w-16 flex-col items-center justify-center rounded-xl text-center ${
+            isLive ? "bg-lime/15" : "bg-base-2"
+          }`}
+        >
+          <span className={`font-display text-lg font-bold leading-none ${isLive ? "text-lime" : "text-cream"}`}>
             {formatTime12(r.time).split(" ")[0]}
           </span>
           <span className="text-[10px] uppercase tracking-wider text-fog">
@@ -612,14 +623,17 @@ function ResultCard({
             <h4 className="truncate font-display text-base font-semibold text-cream">
               {r.course.name}
             </h4>
-            {r.source === "live" ? (
-              <span className="rounded-full bg-lime/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
-                Live
+            {isLive ? (
+              <span
+                title="Confirmed on the course's live tee sheet right now"
+                className="shrink-0 rounded-full bg-lime/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime"
+              >
+                ● Live
               </span>
             ) : (
               <span
-                title="Estimated — confirm on the course's site"
-                className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog"
+                title="Estimated — this date's live sheet isn't open yet; confirm on the course's site"
+                className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog"
               >
                 Est.
               </span>
@@ -645,14 +659,29 @@ function ResultCard({
               {formatPrice(r.price)}
             </span>
           </div>
-          <p className="text-xs text-fog">per player · {r.players} spots</p>
+          <p className="text-xs text-fog">
+            {isLive ? (
+              <>
+                per player ·{" "}
+                <span className="text-lime">
+                  {r.players} {r.players === 1 ? "spot" : "spots"} open
+                </span>
+              </>
+            ) : (
+              "estimated · per player"
+            )}
+          </p>
         </div>
         <button
           type="button"
           onClick={onBook}
-          className="rounded-xl border border-lime/40 bg-lime/10 px-5 py-2.5 text-sm font-semibold text-lime transition hover:bg-lime hover:text-[#08160d]"
+          className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+            isLive
+              ? "bg-lime text-[#08160d] hover:brightness-105"
+              : "border border-lime/40 bg-lime/10 text-lime hover:bg-lime hover:text-[#08160d]"
+          }`}
         >
-          Book
+          {isLive ? "Book" : "Check"}
         </button>
       </div>
     </div>

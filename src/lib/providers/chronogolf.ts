@@ -56,7 +56,16 @@ interface Teetime {
   has_cart?: boolean;
   max_player_size?: number;
   course?: { holes?: number; name?: string; uuid?: string };
-  default_price?: { green_fee?: number | null; subtotal?: number | null };
+  default_price?: {
+    green_fee?: number | null;
+    subtotal?: number | null;
+    /** Round length this price/slot is bookable for (9 or 18). */
+    bookable_holes?: number | null;
+  };
+}
+
+interface ClubDetail {
+  courses?: Array<{ uuid?: string; id?: number; holes?: number }>;
 }
 
 async function getJson<T>(url: string, revalidate: number): Promise<T | null> {
@@ -166,35 +175,61 @@ function pad(t: string): { time: string; minutes: number } | null {
   };
 }
 
+/**
+ * Resolve a club slug to its bookable COURSE uuids.
+ *
+ * CRITICAL: the `/teetimes` endpoint keys off the *course* uuid, not the *club*
+ * uuid returned by `/search`. Passing the club uuid returns status:"closed"
+ * for everything — which is why the app used to show only estimates. The club
+ * detail endpoint lists the real course uuids. Cached in-process for 6h.
+ */
+const courseUuidCache = new Map<string, { at: number; uuids: string[] }>();
+
+async function getCourseUuids(slug: string): Promise<string[]> {
+  const now = Date.now();
+  const cached = courseUuidCache.get(slug);
+  if (cached && now - cached.at < DIRECTORY_TTL_MS) return cached.uuids;
+
+  const detail = await getJson<ClubDetail>(`${BASE}/clubs/${slug}`, 21600);
+  const uuids = (detail?.courses ?? [])
+    .map((c) => c.uuid)
+    .filter((u): u is string => typeof u === "string" && u.length > 0);
+  if (uuids.length) courseUuidCache.set(slug, { at: now, uuids });
+  return uuids;
+}
+
 /** Fetch live tee times for a single course on a date. Best-effort. */
 export async function fetchCourseTeeTimes(
   course: GolfCourse,
   date: string,
 ): Promise<TeeTime[]> {
-  if (DISABLED || !course.chronogolfUuid || !course.online) return [];
+  if (DISABLED || !course.chronogolfSlug || !course.online) return [];
 
-  const holeQueries = [...new Set(course.holes.map((h) => (h >= 18 ? 18 : h)))].slice(0, 2);
-  const queries = holeQueries.length ? holeQueries : [18];
+  const courseUuids = await getCourseUuids(course.chronogolfSlug);
+  if (!courseUuids.length) return [];
 
-  const batches = await Promise.all(
-    queries.map((h) =>
-      getJson<TeetimesResponse>(
-        `${BASE}/teetimes?start_date=${date}&course_ids=${course.chronogolfUuid}` +
-          `&holes=${h}&start_time=00:00&page=1`,
-        120,
-      ),
-    ),
-  );
+  // Ask for both round lengths the club offers, in one query per page.
+  const holes =
+    [...new Set(course.holes.map((h) => (h >= 18 ? 18 : 9)))].join(",") || "9,18";
+  const ids = courseUuids.join(",");
 
   const out: TeeTime[] = [];
   const seen = new Set<string>();
-  for (const data of batches) {
-    for (const row of parseTeetimesResponse(course, date, data)) {
+  for (let page = 1; page <= 4; page++) {
+    const data = await getJson<TeetimesResponse>(
+      `${BASE}/teetimes?start_date=${date}&course_ids=${ids}` +
+        `&holes=${holes}&start_time=00:00&page=${page}`,
+      120,
+    );
+    const rows = parseTeetimesResponse(course, date, data);
+    for (const row of rows) {
       const key = `${row.time}-${row.holes}`;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(row);
     }
+    // Stop once a page comes back short (last page) or empty.
+    if (!data?.teetimes || data.teetimes.length < 20) break;
   }
   return out;
 }
@@ -216,14 +251,17 @@ export function parseTeetimesResponse(
 ): TeeTime[] {
   if (!data || data.status !== "open" || !Array.isArray(data.teetimes)) return [];
   const out: TeeTime[] = [];
-  for (const [i, t] of data.teetimes.entries()) {
+  for (const t of data.teetimes) {
     const parsed = pad(t.start_time ?? "");
     if (!parsed) continue;
     const price = t.default_price?.green_fee ?? t.default_price?.subtotal;
-    if (typeof price !== "number") continue;
-    const holes = t.course?.holes ?? 18;
+    // Skip slots with no real public price ($0 = members/affiliation-only rate).
+    if (typeof price !== "number" || price <= 0) continue;
+    // Round length the price is bookable for (9/18) — NOT the course's total.
+    const holes = t.default_price?.bookable_holes ?? t.course?.holes ?? 18;
     out.push({
-      id: `${course.id}-${date}-live-${holes}-${i}`,
+      // Stable + unique per (course, date, round length, tee time).
+      id: `${course.id}-${date}-live-${holes}-${parsed.minutes}`,
       courseId: course.id,
       date,
       time: parsed.time,
