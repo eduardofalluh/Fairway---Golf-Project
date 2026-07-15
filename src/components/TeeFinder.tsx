@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import type { Region, TeeTimeResult } from "@/lib/types";
 import type { SearchResponse } from "@/lib/aggregator";
 import { REGIONS } from "@/lib/types";
@@ -11,8 +12,22 @@ import {
   minutesToLabel,
   todayISO,
 } from "@/lib/format";
+import { haversineKm } from "@/lib/geo";
 import { useProfile } from "@/lib/useProfile";
 import { BookingModal } from "./BookingModal";
+import type { MapCourse } from "./CourseMap";
+
+// Rough driving-time estimate from straight-line distance (metro road factor).
+const driveMinutes = (km: number) => Math.max(1, Math.round(km * 1.2));
+
+const CourseMap = dynamic(async () => (await import("./CourseMap")).CourseMap, {
+  ssr: false,
+  loading: () => (
+    <div className="grid h-[520px] w-full place-items-center rounded-3xl border border-line bg-surface/40 text-fog">
+      Loading map…
+    </div>
+  ),
+});
 
 type SortKey =
   | "price-desc"
@@ -69,6 +84,32 @@ export function TeeFinder() {
   const [aiText, setAiText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Location + view
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoBusy, setGeoBusy] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "map">("list");
+
+  const useMyLocation = useCallback(() => {
+    if (!("geolocation" in navigator)) {
+      setGeoError("Location isn't available in this browser.");
+      return;
+    }
+    setGeoBusy(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoBusy(false);
+      },
+      () => {
+        setGeoError("Couldn't get your location — allow it and try again.");
+        setGeoBusy(false);
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+    );
+  }, []);
 
   const runSearch = useCallback(
     async (scroll = false, ov?: Partial<SearchValues>) => {
@@ -168,6 +209,69 @@ export function TeeFinder() {
 
   const toggleRegion = (r: Region) =>
     setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
+
+  // Results ordered by distance from the user when we know where they are and
+  // they picked "Nearest to me" — otherwise the server order.
+  const orderedResults = useMemo(() => {
+    if (!data) return [] as TeeTimeResult[];
+    if (userLoc && sort === "distance") {
+      return [...data.results].sort(
+        (a, b) =>
+          haversineKm(userLoc.lat, userLoc.lng, a.course.lat, a.course.lng) -
+          haversineKm(userLoc.lat, userLoc.lng, b.course.lat, b.course.lng),
+      );
+    }
+    return data.results;
+  }, [data, userLoc, sort]);
+
+  // One marker per course for the map: nearest-to-desired-time slot, min price,
+  // live if any of its slots is live.
+  const mapCourses = useMemo<MapCourse[]>(() => {
+    if (!data) return [];
+    const byId = new Map<string, MapCourse & { delta: number }>();
+    for (const r of data.results) {
+      const c = r.course;
+      if (typeof c.lat !== "number" || typeof c.lng !== "number") continue;
+      const km = userLoc
+        ? haversineKm(userLoc.lat, userLoc.lng, c.lat, c.lng)
+        : null;
+      const existing = byId.get(c.id);
+      if (!existing) {
+        byId.set(c.id, {
+          id: c.id,
+          name: c.name,
+          lat: c.lat,
+          lng: c.lng,
+          live: r.source === "live",
+          time: formatTime12(r.time),
+          price: r.price,
+          distanceKm: km,
+          driveMin: km != null ? driveMinutes(km) : null,
+          bookingUrl: r.bookingUrl,
+          delta: r.deltaMinutes,
+        });
+      } else {
+        existing.live = existing.live || r.source === "live";
+        existing.price = Math.min(existing.price, r.price);
+        if (r.deltaMinutes < existing.delta) {
+          existing.delta = r.deltaMinutes;
+          existing.time = formatTime12(r.time);
+          existing.bookingUrl = r.bookingUrl;
+        }
+      }
+    }
+    return [...byId.values()];
+  }, [data, userLoc]);
+
+  // Closest course to the user (prefer ones with live availability).
+  const nearest = useMemo(() => {
+    if (!userLoc || mapCourses.length === 0) return null;
+    const pool = mapCourses.filter((c) => c.live);
+    const list = (pool.length ? pool : mapCourses).filter(
+      (c) => c.distanceKm != null,
+    );
+    return list.sort((a, b) => a.distanceKm! - b.distanceKm!)[0] ?? null;
+  }, [mapCourses, userLoc]);
 
   return (
     <section id="search" className="relative mx-auto max-w-[1600px] px-5 lg:px-10 py-20 sm:py-28">
@@ -449,9 +553,39 @@ export function TeeFinder() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={useMyLocation}
+                  disabled={geoBusy}
+                  className={`inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition disabled:opacity-60 ${
+                    userLoc
+                      ? "border-lime bg-lime/15 text-lime"
+                      : "border-line bg-base-2 text-fog hover:border-lime-soft hover:text-cream"
+                  }`}
+                  title="Sort and measure by distance from where you are"
+                >
+                  <span aria-hidden>📍</span>
+                  {geoBusy ? "Locating…" : userLoc ? "Using your location" : "Use my location"}
+                </button>
+
+                <div className="flex h-11 items-center rounded-xl border border-line bg-base-2 p-1">
+                  {(["list", "map"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setView(v)}
+                      className={`h-full rounded-lg px-3 text-sm font-semibold capitalize transition ${
+                        view === v ? "bg-lime text-[#08160d]" : "text-fog hover:text-cream"
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+
                 {profile ? (
-                  <span className="hidden items-center gap-2 rounded-full border border-line bg-base-2 px-3 py-2 text-xs text-fog sm:flex">
+                  <span className="hidden items-center gap-2 rounded-full border border-line bg-base-2 px-3 py-2 text-xs text-fog lg:flex">
                     <span className="h-1.5 w-1.5 rounded-full bg-lime" />
                     {profile.email}
                     <button onClick={clear} className="text-fog/70 underline-offset-2 hover:text-cream hover:underline">
@@ -476,6 +610,32 @@ export function TeeFinder() {
               </div>
             </div>
 
+            {geoError && (
+              <p className="mb-3 text-sm text-amber-300/90">{geoError}</p>
+            )}
+
+            {/* Closest-to-you suggestion once we know where they are. */}
+            {nearest && (
+              <button
+                type="button"
+                onClick={() => setSort("distance")}
+                className="mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-lime/30 bg-lime/[0.06] px-4 py-3 text-left transition hover:border-lime/60"
+              >
+                <span className="text-sm text-cream">
+                  📍 Closest to you:{" "}
+                  <span className="font-semibold">{nearest.name}</span>
+                  <span className="text-fog">
+                    {" "}
+                    · {nearest.distanceKm} km · ~{nearest.driveMin} min drive
+                    {nearest.live ? " · live now" : ""}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-lime">
+                  Sort by nearest →
+                </span>
+              </button>
+            )}
+
             {error && (
               <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
                 {error}
@@ -489,32 +649,48 @@ export function TeeFinder() {
               </div>
             )}
 
-            <motion.ul layout className="grid gap-3">
-              <AnimatePresence mode="popLayout">
-                {data.results.slice(0, 60).map((r, i) => (
-                  <motion.li
-                    layout
-                    key={r.id}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.4) }}
-                  >
-                    <ResultCard
-                      target={useTarget ? targetPrice : undefined}
-                      r={r}
-                      onBook={() => setBookingTee(r)}
-                    />
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </motion.ul>
+            {view === "map" && data.results.length > 0 ? (
+              <>
+                <CourseMap courses={mapCourses} user={userLoc} />
+                <p className="mt-3 text-center text-xs text-fog">
+                  {mapCourses.length} courses ·{" "}
+                  <span className="text-lime">● live</span> vs{" "}
+                  <span className="text-fog">● estimated</span>
+                  {userLoc ? " · blue dot is you" : " · tap “Use my location” to measure distance"}
+                  . Tap a dot for times &amp; booking.
+                </p>
+              </>
+            ) : (
+              <>
+                <motion.ul layout className="grid gap-3">
+                  <AnimatePresence mode="popLayout">
+                    {orderedResults.slice(0, 60).map((r, i) => (
+                      <motion.li
+                        layout
+                        key={r.id}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.4) }}
+                      >
+                        <ResultCard
+                          target={useTarget ? targetPrice : undefined}
+                          r={r}
+                          userLoc={userLoc}
+                          onBook={() => setBookingTee(r)}
+                        />
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
+                </motion.ul>
 
-            {data.results.length > 60 && (
-              <p className="mt-4 text-center text-sm text-fog">
-                Showing the top 60 of {data.results.length}. Tighten your filters to
-                narrow it down.
-              </p>
+                {orderedResults.length > 60 && (
+                  <p className="mt-4 text-center text-sm text-fog">
+                    Showing the top 60 of {orderedResults.length}. Tighten your filters
+                    to narrow it down.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
@@ -589,14 +765,20 @@ function Chip({
 function ResultCard({
   r,
   target,
+  userLoc,
   onBook,
 }: {
   r: SearchResponse["results"][number];
   target?: number;
+  userLoc: { lat: number; lng: number } | null;
   onBook: () => void;
 }) {
   const near = target != null && Math.abs(r.price - target) <= 8;
   const isLive = r.source === "live";
+  const fromYouKm =
+    userLoc && typeof r.course.lat === "number"
+      ? haversineKm(userLoc.lat, userLoc.lng, r.course.lat, r.course.lng)
+      : null;
   return (
     <div
       className={`group flex flex-col gap-4 rounded-2xl border p-5 transition hover:bg-surface sm:flex-row sm:items-center ${
@@ -640,8 +822,15 @@ function ResultCard({
             )}
           </div>
           <p className="mt-0.5 truncate text-sm text-fog">
-            {r.course.city} · {r.course.region} · {r.course.distanceKm} km · {r.holes}{" "}
-            holes
+            {r.course.city} · {r.course.region} ·{" "}
+            {fromYouKm != null ? (
+              <span className="text-cream">
+                📍 {fromYouKm} km · ~{driveMinutes(fromYouKm)} min
+              </span>
+            ) : (
+              `${r.course.distanceKm} km`
+            )}{" "}
+            · {r.holes} holes
             {r.cart ? " · cart" : ""}
           </p>
         </div>
