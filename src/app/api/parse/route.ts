@@ -4,18 +4,17 @@ import { REGIONS } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 /**
- * AI natural-language search parser — via a LiteLLM proxy.
+ * AI natural-language search parser.
  *
  * Takes a free-text request ("cheap twilight 9 for 3 near Laval this weekend
  * under $50") + today's date and returns a structured search query the
- * TeeFinder form can apply.
+ * TeeFinder form can apply, via any OpenAI-compatible /chat/completions
+ * endpoint (OpenAI directly, or a LiteLLM proxy).
  *
- * Talks to a LiteLLM proxy using its OpenAI-compatible /chat/completions
- * endpoint (LiteLLM virtual keys are NOT direct Anthropic keys). Configure via
- * env (.env.local — gitignored):
- *   LITELLM_BASE_URL  e.g. https://litellm.example.com  (or …/v1)
- *   LITELLM_MODEL     the model/alias your proxy exposes, e.g. claude-opus-4-8
- *   LITELLM_API_KEY   the proxy key (falls back to ANTHROPIC_API_KEY)
+ * Config via env (.env.local — gitignored). Defaults to OpenAI:
+ *   key    AI_API_KEY | OPENAI_API_KEY | CODEX_API_KEY | LITELLM_API_KEY | ANTHROPIC_API_KEY
+ *   base   AI_BASE_URL | LITELLM_BASE_URL   (default https://api.openai.com/v1)
+ *   model  AI_MODEL | LITELLM_MODEL         (default gpt-4o)
  */
 
 const SORTS = [
@@ -83,15 +82,23 @@ function chatUrl(base: string): string {
 }
 
 export async function POST(request: Request) {
-  const baseUrl = process.env.LITELLM_BASE_URL;
-  const apiKey = process.env.LITELLM_API_KEY ?? process.env.ANTHROPIC_API_KEY;
-  const model = process.env.LITELLM_MODEL ?? "claude-opus-4-8";
+  const apiKey =
+    process.env.AI_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    process.env.CODEX_API_KEY ??
+    process.env.LITELLM_API_KEY ??
+    process.env.ANTHROPIC_API_KEY;
+  const baseUrl =
+    process.env.AI_BASE_URL ??
+    process.env.LITELLM_BASE_URL ??
+    "https://api.openai.com/v1";
+  const model = process.env.AI_MODEL ?? process.env.LITELLM_MODEL ?? "gpt-4o";
 
-  if (!baseUrl || !apiKey) {
+  if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          "AI search is not configured. Set LITELLM_BASE_URL and LITELLM_API_KEY (and optionally LITELLM_MODEL) in .env.local.",
+          "AI search is not configured. Set OPENAI_API_KEY (or CODEX_API_KEY) in .env.local.",
       },
       { status: 503 },
     );
