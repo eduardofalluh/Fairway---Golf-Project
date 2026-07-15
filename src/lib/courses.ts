@@ -91,6 +91,19 @@ const EXTRA_SEEDS: ExtraSeed[] = [
     access: "public",
     blurb: "36 holes at the foot of Mont Saint-Bruno.",
   },
+  {
+    slug: "la-madeleine",
+    name: "Club de Golf La Madeleine",
+    city: "Sainte-Madeleine",
+    holes: [18, 18],
+    lat: 45.61,
+    lng: -73.12,
+    weekday: 48,
+    weekend: 60,
+    bookingUrl: "https://www.golflamadeleine.qc.ca/",
+    access: "public",
+    blurb: "Two public 18s (Le Presidential & Le Doral) in the Montérégie.",
+  },
 ];
 
 export const EXTRA_COURSES: GolfCourse[] = EXTRA_SEEDS.map((e) => ({
