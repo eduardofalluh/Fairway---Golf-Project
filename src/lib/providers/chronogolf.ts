@@ -2,6 +2,7 @@ import type { GolfCourse, TeeTime } from "../types";
 import { classifyRegion, distanceFromMarket } from "../geo";
 import { getMarket } from "../markets";
 import type { MarketId } from "../types";
+import { CHRONOGOLF_COURSE_UUIDS } from "./chronogolf-course-uuids";
 
 /**
  * Live Chronogolf (Lightspeed Golf) integration.
@@ -208,6 +209,15 @@ async function getCourseUuids(slug: string): Promise<string[]> {
   const now = Date.now();
   const cached = courseUuidCache.get(slug);
   if (cached && now - cached.at < DIRECTORY_TTL_MS) return cached.uuids;
+
+  // Some serverless hosts can read Chronogolf's public search and tee-time
+  // endpoints but receive an empty/blocked response from `/clubs/:slug`. Keep a
+  // current generated map so live tee-time search still works in production.
+  const fallback = CHRONOGOLF_COURSE_UUIDS[slug];
+  if (fallback?.length) {
+    courseUuidCache.set(slug, { at: now, uuids: fallback });
+    return fallback;
+  }
 
   const detail = await getJson<ClubDetail>(`${BASE}/clubs/${slug}`, 21600);
   const uuids = (detail?.courses ?? [])
