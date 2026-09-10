@@ -1,19 +1,56 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowUpRight, KeyRound, ShieldCheck } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowUpRight, CheckCircle2, KeyRound, ShieldCheck } from "lucide-react";
 import {
   GGGOLF_CLUB_PORTALS,
   PROVIDER_ACCOUNT_LINKS,
 } from "@/lib/providers/config";
 
-type AccountProviderId = (typeof PROVIDER_ACCOUNT_LINKS)[number]["id"];
+const CONNECTED_STORAGE_KEY = "fairway-provider-connections";
 
 export function ProviderAccounts() {
-  const [openedProvider, setOpenedProvider] = useState<AccountProviderId | null>(
-    null,
-  );
+  const [openedKey, setOpenedKey] = useState<string | null>(null);
+  const [connectedKeys, setConnectedKeys] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = window.localStorage.getItem(CONNECTED_STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const [gggolfPortal, setGggolfPortal] = useState("");
+
+  const connectedSet = useMemo(() => new Set(connectedKeys), [connectedKeys]);
+  const connectedCount = connectedKeys.length;
+
+  const saveConnected = (key: string) => {
+    setConnectedKeys((current) => {
+      const next = Array.from(new Set([...current, key]));
+      try {
+        window.localStorage?.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Some privacy contexts disable localStorage; keep the in-page state.
+      }
+      return next;
+    });
+    setOpenedKey(null);
+  };
+
+  const removeConnected = (key: string) => {
+    setConnectedKeys((current) => {
+      const next = current.filter((item) => item !== key);
+      try {
+        window.localStorage?.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Some privacy contexts disable localStorage; keep the in-page state.
+      }
+      return next;
+    });
+    setOpenedKey(null);
+  };
 
   return (
     <section
@@ -44,13 +81,12 @@ export function ProviderAccounts() {
             <AccountStat label="Chronogolf" value="Live tee times" />
             <AccountStat label="MinuteGolf" value="Central login" />
             <AccountStat label="GGGolf" value={`${GGGOLF_CLUB_PORTALS.length} verified portals`} />
-            <AccountStat label="Security" value="Provider hosted" />
+            <AccountStat label="Connected" value={`${connectedCount} active`} />
           </div>
         </div>
 
         <div className="mt-9 grid gap-4 md:grid-cols-3">
           {PROVIDER_ACCOUNT_LINKS.map((provider) => {
-            const wasOpened = openedProvider === provider.id;
             const selectedClub = GGGOLF_CLUB_PORTALS.find(
               (club) => club.href === gggolfPortal,
             );
@@ -62,17 +98,37 @@ export function ProviderAccounts() {
               provider.id === "gggolf" && selectedClub
                 ? `Sign in · ${selectedClub.name}`
                 : provider.action;
+            const connectionKey = href
+              ? `${provider.id}:${href}`
+              : `${provider.id}:pending`;
+            const isConnected = href ? connectedSet.has(connectionKey) : false;
+            const wasOpened = openedKey === connectionKey;
             return (
               <article
                 key={provider.id}
-                className="rounded-[1.75rem] border border-[#cbd3c7] bg-[#fffdf7] p-6 shadow-[0_18px_55px_rgba(21,53,40,0.08)] sm:p-8"
+                className={`rounded-[1.75rem] border p-6 shadow-[0_18px_55px_rgba(21,53,40,0.08)] sm:p-8 ${
+                  isConnected
+                    ? "border-[#9eb58b] bg-[#f8fff1]"
+                    : "border-[#cbd3c7] bg-[#fffdf7]"
+                }`}
               >
                 <div className="flex items-start justify-between gap-5">
                   <span className="grid size-12 place-items-center rounded-2xl bg-[#153528] text-[#f4c95d]">
                     <KeyRound aria-hidden="true" size={22} />
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#cbd3c7] px-3 py-1 text-xs font-semibold text-[#547164]">
-                    <ShieldCheck aria-hidden="true" size={14} /> Provider hosted
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                      isConnected
+                        ? "border-[#88a56e] bg-[#e9f8d6] text-[#2d5d21]"
+                        : "border-[#cbd3c7] text-[#547164]"
+                    }`}
+                  >
+                    {isConnected ? (
+                      <CheckCircle2 aria-hidden="true" size={14} />
+                    ) : (
+                      <ShieldCheck aria-hidden="true" size={14} />
+                    )}{" "}
+                    {isConnected ? "Live · Connected" : "Provider hosted"}
                   </span>
                 </div>
                 <h3 className="mt-7 font-display text-2xl font-bold">
@@ -94,7 +150,7 @@ export function ProviderAccounts() {
                       value={gggolfPortal}
                       onChange={(event) => {
                         setGggolfPortal(event.target.value);
-                        setOpenedProvider(null);
+                        setOpenedKey(null);
                       }}
                       className="min-h-12 w-full rounded-xl border border-[#cbd3c7] bg-[#f3efe4] px-4 text-sm font-semibold text-[#153528] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#153528]"
                     >
@@ -107,22 +163,51 @@ export function ProviderAccounts() {
                     </select>
                   </div>
                 )}
-                {href ? <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setOpenedProvider(provider.id)}
-                  className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#153528] px-5 py-3 text-center text-sm font-bold text-[#fffdf7] transition hover:bg-[#214d3a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#153528]"
-                >
-                  {action}
-                  <ArrowUpRight aria-hidden="true" size={17} />
-                </a> : (
+                {isConnected ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#2f651f] px-5 py-3 text-center text-sm font-bold text-white"
+                  >
+                    <CheckCircle2 aria-hidden="true" size={17} />
+                    Connected
+                  </button>
+                ) : href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setOpenedKey(connectionKey)}
+                    className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#153528] px-5 py-3 text-center text-sm font-bold text-[#fffdf7] transition hover:bg-[#214d3a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#153528]"
+                  >
+                    {action}
+                    <ArrowUpRight aria-hidden="true" size={17} />
+                  </a>
+                ) : (
                   <button
                     type="button"
                     disabled
                     className="mt-6 flex min-h-12 w-full items-center justify-center rounded-full bg-[#153528]/15 px-5 py-3 text-center text-sm font-bold text-[#547164]"
                   >
                     Choose a club to sign in
+                  </button>
+                )}
+                {wasOpened && !isConnected && href && (
+                  <button
+                    type="button"
+                    onClick={() => saveConnected(connectionKey)}
+                    className="mt-3 flex min-h-11 w-full items-center justify-center rounded-full border border-[#9eb58b] bg-[#f2fae6] px-5 py-2.5 text-center text-sm font-bold text-[#2d5d21] transition hover:bg-[#e6f6d0]"
+                  >
+                    I&apos;m logged in
+                  </button>
+                )}
+                {isConnected && (
+                  <button
+                    type="button"
+                    onClick={() => removeConnected(connectionKey)}
+                    className="mt-3 block w-full text-center text-sm text-[#547164] underline underline-offset-4"
+                  >
+                    Disconnect on this device
                   </button>
                 )}
                 {provider.id === "gggolf" && (
@@ -139,9 +224,11 @@ export function ProviderAccounts() {
                   className="mt-3 text-center text-xs text-[#6f8178]"
                   aria-live="polite"
                 >
-                  {wasOpened
-                    ? `${provider.name} opened in a new tab. Fairway cannot read or confirm that session yet.`
-                    : href ? "Opens the provider's login form in a new tab." : "GGGolf accounts are accessed through your club."}
+                  {isConnected
+                    ? `${provider.name} is marked connected on this device.`
+                    : wasOpened
+                      ? `Confirm once you are signed in so Fairway can mark ${provider.name} as connected here.`
+                      : href ? "Opens the provider's login form in a new tab." : "GGGolf accounts are accessed through your club."}
                 </p>
               </article>
             );

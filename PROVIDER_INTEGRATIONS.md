@@ -30,10 +30,16 @@ club-specific, so golfers must enter through their club's portal. The booking
 modal uses the tee time's real provider or course URL and clearly states that no
 reservation exists until the provider confirms it.
 
-Fairway does not collect GGGolf or MinuteGolf passwords, copy provider cookies,
-claim that an external account is connected, or report a reservation as booked.
-The provider account buttons only open official pages; browser security prevents
-Fairway from reading the resulting provider session.
+Fairway does not collect provider passwords, copy provider cookies, verify
+external account sessions, or report a reservation as booked. The provider
+account buttons only open official pages; browser security prevents Fairway from
+reading the resulting provider session.
+
+After opening a provider login page, users can mark that provider as connected
+inside Fairway. That state is local to the user's browser and only affects the
+account card display: the sign-in button becomes a disabled connected button
+until the user disconnects it on that device. It is not provider-authenticated
+OAuth state.
 
 The active `/api/autobook` route returns `501 Not Implemented`. It no longer
 launches a browser or suggests that Fairway can complete a checkout. Tee-time

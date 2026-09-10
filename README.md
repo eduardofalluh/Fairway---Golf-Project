@@ -13,7 +13,9 @@ continue to the course's booking provider.
   guaranteed prices, and cannot be booked within Fairway.
 - Official Chronogolf, MinuteGolf, and club-specific GGGolf account access open
   on the provider's site. Fairway does not receive passwords, inspect those
-  browser sessions, or claim the accounts are linked.
+  browser sessions, or claim the accounts are linked. Users can mark a provider
+  as connected on their own device after signing in, which changes the account
+  card to a disabled connected state.
 - Selecting a result opens a review panel. The provider confirms availability,
   the final price and the reservation. Fairway does not make reservations or
   payments; `/api/autobook` returns HTTP 501.
