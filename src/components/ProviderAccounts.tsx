@@ -19,10 +19,10 @@ export function ProviderAccounts() {
     <section
       id="accounts"
       aria-labelledby="provider-accounts-title"
-      className="scroll-mt-20 border-b border-[#d6cebd] bg-[#f3efe4] px-5 py-14 text-[#153528] sm:px-8 sm:py-18"
+      className="scroll-mt-20 border-b border-[#d6cebd] bg-[#f3efe4] px-5 py-16 text-[#153528] sm:px-8 lg:py-20"
     >
       <div className="mx-auto max-w-6xl">
-        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div className="max-w-2xl">
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#547164]">
               Start here
@@ -40,11 +40,11 @@ export function ProviderAccounts() {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:justify-self-end">
+          <div className="grid gap-3 sm:grid-cols-2 lg:justify-self-end">
             <AccountStat label="Chronogolf" value="Live tee times" />
             <AccountStat label="MinuteGolf" value="Central login" />
             <AccountStat label="GGGolf" value={`${GGGOLF_CLUB_PORTALS.length} verified portals`} />
-            <AccountStat label="Connected" value={`${connectedCount} active`} />
+            <AccountStat label="Connected" value={`${connectedCount} active`} emphasis />
           </div>
         </div>
 
@@ -208,9 +208,23 @@ export function ProviderAccounts() {
   );
 }
 
-function AccountStat({ label, value }: { label: string; value: string }) {
+function AccountStat({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
   return (
-    <div className="rounded-2xl border border-[#cbd3c7] bg-[#fffdf7]/70 p-4 shadow-[0_10px_30px_rgba(21,53,40,0.05)]">
+    <div
+      className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(21,53,40,0.05)] ${
+        emphasis
+          ? "border-[#9eb58b] bg-[#f8fff1]"
+          : "border-[#cbd3c7] bg-[#fffdf7]/80"
+      }`}
+    >
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6f8178]">
         {label}
       </p>

@@ -129,3 +129,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 #search .input:focus { border-color: var(--color-forest); }
 #search fieldset { min-width: 0; }
+
+
+/* Netlify can inject a badge on CLI-created sites; it overlaps Fairway's bottom-right UI. */
+#nl-badge,
+#nl-badge-frame,
+[id^="netlify-badge"],
+[data-netlify-badge],
+iframe[src*="netlify.com"][title*="Netlify"] {
+  display: none !important;
+}
