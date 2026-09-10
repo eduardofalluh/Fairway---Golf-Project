@@ -37,7 +37,7 @@ export function Hero({
   };
 
   return (
-    <section ref={sectionRef} className="relative isolate flex min-h-[660px] items-center overflow-hidden px-5 pb-16 pt-36 sm:px-8 lg:min-h-[700px] lg:px-10 lg:pb-20 lg:pt-40">
+    <section ref={sectionRef} className="relative isolate flex min-h-[560px] items-center overflow-hidden px-4 pb-14 pt-28 sm:min-h-[660px] sm:px-8 sm:pt-36 lg:min-h-[700px] lg:px-10 lg:pb-20 lg:pt-40">
       <motion.div style={{ y: reduceMotion ? 0 : mediaY }} className="absolute -inset-y-10 inset-x-0 -z-20">
         <video ref={videoRef} autoPlay={!reduceMotion} muted loop playsInline preload="metadata" poster="/hero.jpg" aria-hidden="true" className="h-full w-full object-cover object-[52%_45%]">
           <source src="/hero.mp4" type="video/mp4" />
@@ -53,16 +53,16 @@ export function Hero({
             <span className="h-px w-8 bg-lime" />
             Montréal + Toronto · {marketCount} markets · {courseCount} courses tracked
           </motion.p>
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="font-display text-[clamp(3.25rem,7vw,6.35rem)] font-semibold leading-[0.95] tracking-[-0.045em]">
+          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="font-display text-[clamp(3rem,14vw,6.35rem)] font-semibold leading-[0.95] tracking-[-0.045em] sm:text-[clamp(3.25rem,7vw,6.35rem)]">
             Find your round.
             <span className="mt-2 block text-lime sm:pl-20 lg:pl-28">We&apos;ll line it up.</span>
           </motion.h1>
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }} className="mt-7 flex flex-wrap items-center gap-5">
-            <a href="#search" className="button-primary group">
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }} className="mt-7 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
+            <a href="#search" className="button-primary group w-full sm:w-auto">
               Explore tee times
               <ArrowDownRight size={17} className="transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
             </a>
-            <a href="#accounts" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-3 text-xs font-extrabold uppercase tracking-[0.1em] text-white backdrop-blur transition hover:border-lime hover:text-lime focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime">
+            <a href="#accounts" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-3 text-xs font-extrabold uppercase tracking-[0.1em] text-white backdrop-blur transition hover:border-lime hover:text-lime focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime sm:w-auto">
               <KeyRound size={16} aria-hidden="true" />
               Connect accounts
             </a>

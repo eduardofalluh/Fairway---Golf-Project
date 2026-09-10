@@ -22,6 +22,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 7rem;
   background: var(--color-base);
   color: var(--color-cream);
   -webkit-font-smoothing: antialiased;
@@ -130,6 +131,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 #search .input:focus { border-color: var(--color-forest); }
 #search fieldset { min-width: 0; }
 
+
+@media (max-width: 640px) {
+  html { scroll-padding-top: 6rem; }
+  body {
+    background:
+      radial-gradient(520px 320px at 100% 18%, rgba(202, 236, 85, 0.08), transparent 62%),
+      var(--color-base);
+  }
+  #search .input {
+    min-height: 3rem;
+    border-radius: 1rem;
+    font-size: 1rem;
+  }
+  #search input[type="range"] {
+    margin-block: .55rem;
+  }
+}
 
 /* Netlify can inject a badge on CLI-created sites; it overlaps Fairway's bottom-right UI. */
 #nl-badge,

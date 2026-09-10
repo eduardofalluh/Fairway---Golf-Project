@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { ArrowUpRight, CheckCircle2, KeyRound, ShieldCheck } from "lucide-react";
 import {
   GGGOLF_CLUB_PORTALS,
@@ -19,17 +20,23 @@ export function ProviderAccounts() {
     <section
       id="accounts"
       aria-labelledby="provider-accounts-title"
-      className="scroll-mt-20 border-b border-[#d6cebd] bg-[#f3efe4] px-5 py-16 text-[#153528] sm:px-8 lg:py-20"
+      className="border-b border-[#d6cebd] bg-[#f3efe4] px-4 py-12 text-[#153528] sm:px-8 sm:py-16 lg:py-20"
     >
       <div className="mx-auto max-w-6xl">
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <motion.div
+          initial={{ opacity: 0, y: 22 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false, amount: 0.25 }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+          className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start"
+        >
           <div className="max-w-2xl">
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#547164]">
               Start here
             </p>
             <h2
               id="provider-accounts-title"
-              className="font-display text-4xl font-bold tracking-tight sm:text-5xl"
+              className="font-display text-4xl font-bold leading-[.95] tracking-tight sm:text-5xl"
             >
               Connect your booking accounts first.
             </h2>
@@ -47,9 +54,9 @@ export function ProviderAccounts() {
             <AccountStat label="Toronto" value="City + GTA links" />
             <AccountStat label="Connected" value={`${connectedCount} active`} emphasis />
           </div>
-        </div>
+        </motion.div>
 
-        <div className="mt-9 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-8 grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
           {PROVIDER_ACCOUNT_LINKS.map((provider) => {
             const selectedClub = GGGOLF_CLUB_PORTALS.find(
               (club) => club.href === gggolfPortal,
@@ -66,9 +73,13 @@ export function ProviderAccounts() {
             const providerConnected = href ? isConnected(provider.id, href) : false;
             const wasOpened = openedKey === connectionKey;
             return (
-              <article
+              <motion.article
                 key={provider.id}
-                className={`rounded-[1.75rem] border p-6 shadow-[0_18px_55px_rgba(21,53,40,0.08)] sm:p-8 ${
+                initial={{ opacity: 0, y: 20, scale: 0.985 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: false, amount: 0.18 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                className={`rounded-[1.4rem] border p-5 shadow-[0_18px_55px_rgba(21,53,40,0.08)] sm:rounded-[1.75rem] sm:p-8 ${
                   providerConnected
                     ? "border-[#9eb58b] bg-[#f8fff1]"
                     : "border-[#cbd3c7] bg-[#fffdf7]"
@@ -93,7 +104,7 @@ export function ProviderAccounts() {
                     {providerConnected ? "Live · Connected" : "Provider hosted"}
                   </span>
                 </div>
-                <h3 className="mt-7 font-display text-2xl font-bold">
+                <h3 className="mt-5 font-display text-2xl font-bold sm:mt-7">
                   {provider.name}
                 </h3>
                 <p className="mt-2 min-h-12 text-sm leading-6 text-[#547164]">
@@ -193,7 +204,7 @@ export function ProviderAccounts() {
                       ? `Confirm once you are signed in so Fairway can mark ${provider.name} as connected here.`
                       : href ? "Opens the provider's login form in a new tab." : "GGGolf accounts are accessed through your club."}
                 </p>
-              </article>
+              </motion.article>
             );
           })}
         </div>
@@ -221,7 +232,7 @@ function AccountStat({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(21,53,40,0.05)] ${
+      className={`rounded-2xl border p-3 shadow-[0_10px_30px_rgba(21,53,40,0.05)] sm:p-4 ${
         emphasis
           ? "border-[#9eb58b] bg-[#f8fff1]"
           : "border-[#cbd3c7] bg-[#fffdf7]/80"

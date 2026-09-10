@@ -132,7 +132,7 @@ export function CourseMap({
   return (
     <div
       ref={elRef}
-      className="h-[520px] w-full overflow-hidden rounded-3xl border border-line"
+      className="h-[360px] w-full overflow-hidden rounded-2xl border border-line sm:h-[520px] sm:rounded-3xl"
       style={{ background: "#0f2117" }}
     />
   );

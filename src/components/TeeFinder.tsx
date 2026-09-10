@@ -27,7 +27,7 @@ const driveMinutes = (km: number) => Math.max(1, Math.round(km * 1.2));
 const CourseMap = dynamic(async () => (await import("./CourseMap")).CourseMap, {
   ssr: false,
   loading: () => (
-    <div className="grid h-[520px] w-full place-items-center rounded-3xl border border-line bg-surface/40 text-fog">
+    <div className="grid h-[360px] w-full place-items-center rounded-2xl border border-line bg-surface/40 text-fog sm:h-[520px] sm:rounded-3xl">
       Loading map…
     </div>
   ),
@@ -260,25 +260,37 @@ export function TeeFinder() {
   }, [mapCourses, userLoc]);
 
   return (
-    <section id="search" className="relative mx-auto max-w-[1440px] scroll-mt-20 px-5 py-16 sm:px-8 lg:px-10 lg:py-20">
-      <div className="mb-9 grid gap-5 lg:grid-cols-[.7fr_1.3fr] lg:items-end">
+    <section id="search" className="relative mx-auto max-w-[1440px] px-4 py-12 pb-[calc(3rem+env(safe-area-inset-bottom))] sm:px-8 sm:py-16 lg:px-10 lg:py-20">
+      <motion.div
+        initial={{ opacity: 0, y: 22 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, amount: 0.25 }}
+        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+        className="mb-7 grid gap-4 sm:mb-9 lg:grid-cols-[.7fr_1.3fr] lg:items-end"
+      >
         <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Search {marketConfig.areaLabel}</p>
         <div>
-          <h2 className="font-display text-5xl font-semibold leading-[.9] tracking-[-.035em] sm:text-6xl">Your time. Your price.<br />Every fairway.</h2>
-          <p className="mt-4 max-w-xl text-sm leading-6 text-fog">Compare every useful option first. Provider-confirmed slots appear live, and estimates stay clearly labeled.</p>
+          <h2 className="font-display text-4xl font-semibold leading-[.92] tracking-[-.035em] sm:text-6xl">Your time. Your price.<br />Every fairway.</h2>
+          <p className="mt-3 max-w-xl text-base leading-7 text-fog sm:mt-4">Compare every useful option first. Provider-confirmed slots appear live, and estimates stay clearly labeled.</p>
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Search panel ───────────────────────────────────────────── */}
-      <div className="rounded-[2rem] border border-line bg-surface p-5 shadow-[0_24px_80px_rgba(34,55,44,.08)] sm:p-8 lg:p-10">
-        <div className="mb-5 grid gap-3 sm:grid-cols-2">
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.99 }}
+        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        viewport={{ once: false, amount: 0.14 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="rounded-[1.5rem] border border-line bg-surface p-4 shadow-[0_24px_80px_rgba(34,55,44,.08)] sm:rounded-[2rem] sm:p-8 lg:p-10"
+      >
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3">
           {(["montreal", "toronto"] as const).map((id) => (
             <button
               key={id}
               type="button"
               onClick={() => chooseMarket(id)}
               aria-pressed={market === id}
-              className={`rounded-2xl border px-5 py-4 text-left transition ${
+              className={`rounded-2xl border px-3 py-3 text-left transition sm:px-5 sm:py-4 ${
                 market === id
                   ? "border-forest bg-forest text-white shadow-[0_14px_30px_rgba(10,52,34,0.16)]"
                   : "border-line bg-base-2 text-fog hover:border-forest hover:text-cream"
@@ -287,13 +299,13 @@ export function TeeFinder() {
               <span className="text-[10px] font-bold uppercase tracking-[.22em] opacity-70">
                 {MARKETS[id].shortLabel}
               </span>
-              <span className="mt-1 block font-display text-2xl font-semibold">
+              <span className="mt-1 block font-display text-xl font-semibold leading-none sm:text-2xl">
                 {MARKETS[id].areaLabel}
               </span>
             </button>
           ))}
         </div>
-        <div className="mb-8 flex flex-col gap-3 rounded-2xl bg-base px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-7 flex flex-col gap-3 rounded-2xl bg-base px-4 py-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-cream">Availability quality</p>
             <p className="mt-0.5 text-xs text-fog">
@@ -302,12 +314,12 @@ export function TeeFinder() {
                 : "Showing live slots plus labeled estimates. Switch to live-only when you want provider-confirmed inventory only."}
             </p>
           </div>
-          <button type="button" onClick={() => setLiveOnly((value) => !value)} aria-pressed={!liveOnly} className={`inline-flex items-center justify-between gap-3 rounded-full border px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] transition ${!liveOnly ? "border-forest bg-forest text-white" : "border-line bg-surface text-fog hover:border-forest"}`}>
+          <button type="button" onClick={() => setLiveOnly((value) => !value)} aria-pressed={!liveOnly} className={`inline-flex min-h-11 w-full items-center justify-center gap-3 rounded-full border px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] transition sm:w-auto sm:justify-between ${!liveOnly ? "border-forest bg-forest text-white" : "border-line bg-surface text-fog hover:border-forest"}`}>
             <span className={`h-2 w-2 rounded-full ${!liveOnly ? "bg-lime" : "bg-fog/40"}`} />
             {liveOnly ? "Live only" : "Live + estimates"}
           </button>
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-3">
           <Field label="Date">
             <input
               type="date"
@@ -350,7 +362,7 @@ export function TeeFinder() {
           </Field>
         </div>
 
-        <div className="mt-7 grid gap-7 md:grid-cols-2">
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
           {/* Time window slider */}
           <div>
             <div className="mb-2 flex items-baseline justify-between">
@@ -399,7 +411,7 @@ export function TeeFinder() {
         </div>
 
         {/* Price controls */}
-        <div className="mt-7 grid gap-7 md:grid-cols-2">
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm font-medium text-cream">
@@ -484,7 +496,7 @@ export function TeeFinder() {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={() => runSearch(true)}
@@ -496,7 +508,7 @@ export function TeeFinder() {
             </span>
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Results ────────────────────────────────────────────────── */}
       <div ref={resultsRef} className="scroll-mt-24">
@@ -506,7 +518,7 @@ export function TeeFinder() {
           </div>
         )}
         {loading && !data && (
-          <div className="mt-10 grid gap-3" aria-busy="true">
+          <div className="mt-8 grid gap-3 sm:mt-10" aria-busy="true">
             <div className="mb-2 h-7 w-64 animate-pulse rounded-lg bg-surface/60" />
             {Array.from({ length: 6 }).map((_, i) => (
               <div
@@ -518,7 +530,14 @@ export function TeeFinder() {
           </div>
         )}
         {data && (
-          <div className={`mt-10 transition-opacity ${loading ? "pointer-events-none opacity-50" : ""}`} aria-busy={loading}>
+          <motion.div
+            initial={{ opacity: 0, y: 22 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.12 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className={`mt-8 transition-opacity sm:mt-10 ${loading ? "pointer-events-none opacity-50" : ""}`}
+            aria-busy={loading}
+          >
             {loading && (
               <div className="pointer-events-none sticky top-24 z-20 mb-4 flex justify-center">
                 <span className="inline-flex items-center gap-2 rounded-full border border-forest/30 bg-surface/95 px-4 py-2 text-sm font-semibold text-forest shadow-lg backdrop-blur">
@@ -686,7 +705,7 @@ export function TeeFinder() {
                 )}
               </>
             )}
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -784,7 +803,7 @@ function ResultCard({
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="truncate font-display text-base font-semibold text-cream">
+            <h4 className="truncate font-display text-base font-semibold leading-tight text-cream">
               {r.course.name}
             </h4>
             {isLive ? (
@@ -808,7 +827,7 @@ function ResultCard({
               </span>
             )}
           </div>
-          <p className="mt-0.5 truncate text-sm text-fog">
+          <p className="mt-1 line-clamp-2 text-sm leading-5 text-fog sm:truncate">
             {r.course.city} · {r.course.region} ·{" "}
             {fromYouKm != null ? (
               <span className="text-cream">
@@ -823,7 +842,7 @@ function ResultCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 sm:justify-end">
+      <div className="flex items-center justify-between gap-3 sm:justify-end">
         <div className="text-right">
           <div className="flex items-center justify-end gap-2">
             {near && (
@@ -831,7 +850,7 @@ function ResultCard({
                 On budget
               </span>
             )}
-            <span className="font-display text-2xl font-extrabold text-cream">
+            <span className="font-display text-xl font-extrabold text-cream sm:text-2xl">
               {formatPrice(r.price)}
             </span>
           </div>
@@ -853,7 +872,7 @@ function ResultCard({
             href={handoffUrl ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 rounded-xl bg-lime px-5 py-2.5 text-sm font-bold text-forest shadow-[0_10px_24px_rgba(198,242,74,0.22)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime"
+            className="shrink-0 rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-forest sm:px-5 shadow-[0_10px_24px_rgba(198,242,74,0.22)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime"
             aria-label={`Book ${r.course.name} with connected ${provider.name} account`}
           >
             Book with {provider.name} ↗
@@ -862,7 +881,7 @@ function ResultCard({
           <button
             type="button"
             onClick={onBook}
-            className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+            className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition sm:px-5 ${
               isLive
                 ? "bg-forest text-white hover:bg-forest-soft"
                 : "border border-forest/40 bg-transparent text-forest hover:bg-forest hover:text-white"

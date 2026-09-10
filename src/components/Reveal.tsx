@@ -4,12 +4,13 @@ import { motion, type Variants } from "framer-motion";
 import type { ReactNode } from "react";
 
 const variants: Variants = {
-  hidden: { opacity: 0, y: 32, filter: "blur(6px)" },
+  hidden: { opacity: 0, y: 26, scale: 0.985, filter: "blur(6px)" },
   show: {
     opacity: 1,
     y: 0,
+    scale: 1,
     filter: "blur(0px)",
-    transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] },
   },
 };
 
@@ -29,7 +30,7 @@ export function Reveal({
       variants={variants}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: true, margin: "-80px" }}
+      viewport={{ once: false, amount: 0.22, margin: "0px 0px -12% 0px" }}
       transition={{ delay }}
     >
       {children}
@@ -52,7 +53,7 @@ export function RevealGroup({
       className={className}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: true, margin: "-60px" }}
+      viewport={{ once: false, amount: 0.18, margin: "0px 0px -10% 0px" }}
       variants={{ show: { transition: { staggerChildren: stagger } } }}
     >
       {children}
