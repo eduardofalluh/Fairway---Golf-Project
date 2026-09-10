@@ -68,24 +68,24 @@ export const PROVIDER_ACCOUNT_LINKS = [
     id: "gggolf" as const,
     name: "GGGolf",
     href: "https://www.gggolf.ca/aide-aux-golfeurs",
-    action: "Find my club login",
+    action: "Sign in on GGGolf",
     description:
-      "GGGolf member access is provided through each club, so start with your club's portal.",
+      "Choose your club to open its GGGolf login form. Your password stays with GGGolf.",
   },
 ] as const;
 
 export const GGGOLF_CLUB_PORTALS = [
   {
     name: "Le Parcours du Cerf",
-    href: "https://secure.gggolf.ca/cerf/index.php?lang=fr&option=com_ggpublic&req=teetimes",
+    href: "https://secure.gggolf.ca/cerf/index.php?option=com_ggpublic&req=user&lang=fr",
   },
   {
     name: "Golf de l'Île de Montréal",
-    href: "https://secure.gggolf.ca/iledemontreal/index.php?Itemid=123&lang=fr&option=com_ggpublic",
+    href: "https://secure.gggolf.ca/iledemontreal/index.php?option=com_ggpublic&req=user&lang=fr",
   },
   {
     name: "Golf Atlantide",
-    href: "https://secure.gggolf.ca/atlantide/index.php?lang=fr&option=com_ggpublic&req=teetimes",
+    href: "https://secure.gggolf.ca/atlantide/index.php?option=com_ggpublic&req=user&lang=fr",
   },
 ] as const;
 

@@ -1,6 +1,14 @@
 # GGGolf and MinuteGolf integration status
 
-Verified against provider-owned pages on September 9, 2026.
+Verified against provider-owned pages on September 10, 2026.
+
+The GGGolf account selector links directly to the public golfer login forms for
+[Le Parcours du Cerf](https://secure.gggolf.ca/cerf/index.php?option=com_ggpublic&req=user&lang=fr),
+[Golf de l'Île de Montréal](https://secure.gggolf.ca/iledemontreal/index.php?option=com_ggpublic&req=user&lang=fr),
+and [Golf Atlantide](https://secure.gggolf.ca/atlantide/index.php?option=com_ggpublic&req=user&lang=fr).
+Each destination was opened in a browser and verified to display email/password
+fields. A club must be selected before sign-in becomes available; golfer help is
+a separate link. These are login destinations, distinct from tee-sheet URLs.
 
 ## What Fairway supports now
 
