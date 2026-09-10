@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { ArrowDownRight, KeyRound, Pause, Play } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 export function Hero({
   courseCount,
@@ -15,6 +16,7 @@ export function Hero({
   const videoRef = useRef<HTMLVideoElement>(null);
   const reduceMotion = useReducedMotion();
   const [paused, setPaused] = useState(Boolean(reduceMotion));
+  const { t } = useLanguage();
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] });
   const mediaY = useTransform(scrollYProgress, [0, 1], [0, 34]);
 
@@ -41,7 +43,7 @@ export function Hero({
       <motion.div style={{ y: reduceMotion ? 0 : mediaY }} className="absolute -inset-y-10 inset-x-0 -z-20">
         <video ref={videoRef} autoPlay={!reduceMotion} muted loop playsInline preload="metadata" poster="/hero.jpg" aria-hidden="true" className="h-full w-full object-cover object-[52%_45%]">
           <source src="/hero.mp4" type="video/mp4" />
-          Your browser does not support background video.
+          {t.hero.videoUnsupported}
         </video>
       </motion.div>
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(7,31,22,.9)_0%,rgba(7,31,22,.64)_48%,rgba(7,31,22,.08)_80%),linear-gradient(0deg,rgba(7,31,22,.66)_0%,transparent_55%)]" />
@@ -51,26 +53,26 @@ export function Hero({
         <div className="max-w-3xl text-white">
           <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }} className="mb-6 flex flex-wrap items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-white/78">
             <span className="h-px w-8 bg-lime" />
-            Montréal + Toronto · {marketCount} markets · {courseCount} courses tracked
+            {t.hero.eyebrow(marketCount, courseCount)}
           </motion.p>
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="font-display text-[clamp(3rem,14vw,6.35rem)] font-semibold leading-[0.95] tracking-[-0.045em] sm:text-[clamp(3.25rem,7vw,6.35rem)]">
-            Find your round.
-            <span className="mt-2 block text-lime sm:pl-20 lg:pl-28">We&apos;ll line it up.</span>
+            {t.hero.title1}
+            <span className="mt-2 block text-lime sm:pl-20 lg:pl-28">{t.hero.title2}</span>
           </motion.h1>
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }} className="mt-7 flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
             <a href="#search" className="button-primary group w-full sm:w-auto">
-              Explore tee times
+              {t.hero.explore}
               <ArrowDownRight size={17} className="transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
             </a>
             <a href="#accounts" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-3 text-xs font-extrabold uppercase tracking-[0.1em] text-white backdrop-blur transition hover:border-lime hover:text-lime focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime sm:w-auto">
               <KeyRound size={16} aria-hidden="true" />
-              Connect accounts
+              {t.hero.connect}
             </a>
-            <p className="max-w-sm text-sm leading-relaxed text-white/72 sm:text-base">Compare nearby courses and green fees. Find a time that fits.</p>
+            <p className="max-w-sm text-sm leading-relaxed text-white/72 sm:text-base">{t.hero.body}</p>
           </motion.div>
         </div>
 
-        <button type="button" onClick={toggleVideo} aria-label={paused ? "Play background video" : "Pause background video"} className="absolute right-5 bottom-12 grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/35 bg-black/15 text-white backdrop-blur transition hover:bg-black/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime sm:static sm:mb-1">
+        <button type="button" onClick={toggleVideo} aria-label={paused ? t.hero.playVideo : t.hero.pauseVideo} className="absolute right-5 bottom-12 grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/35 bg-black/15 text-white backdrop-blur transition hover:bg-black/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime sm:static sm:mb-1">
           {paused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
         </button>
       </div>

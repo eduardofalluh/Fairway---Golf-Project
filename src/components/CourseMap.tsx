@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Map as LMap, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { safeBookingUrl } from "@/lib/providers/config";
+import { useLanguage } from "@/lib/i18n";
 
 export type MapCourse = {
   id: string;
@@ -33,6 +34,7 @@ export function CourseMap({
   courses: MapCourse[];
   user: { lat: number; lng: number } | null;
 }) {
+  const { lang } = useLanguage();
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
@@ -74,11 +76,13 @@ export function CourseMap({
         const name = document.createElement("strong");
         name.textContent = c.name;
         const detail = document.createElement("p");
-        detail.textContent = `${c.live ? "Live" : "Estimate"} · ${c.time} · ${c.holes} holes · $${c.price} CAD`;
+        detail.textContent = `${c.live ? (lang === "fr" ? "Direct" : "Live") : (lang === "fr" ? "Estimation" : "Estimate")} · ${c.time} · ${c.holes} ${lang === "fr" ? "trous" : "holes"} · $${c.price} CAD`;
         popup.append(name, detail);
         if (c.distanceKm != null) {
           const distance = document.createElement("p");
-          distance.textContent = `${c.distanceKm} km · ~${c.driveMin} min drive from you`;
+          distance.textContent = lang === "fr"
+            ? `${c.distanceKm} km · ~${c.driveMin} min de route depuis vous`
+            : `${c.distanceKm} km · ~${c.driveMin} min drive from you`;
           popup.append(distance);
         }
         const bookingUrl = safeBookingUrl(c.bookingUrl);
@@ -88,7 +92,7 @@ export function CourseMap({
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           link.style.cssText = "color:#174b36;font-weight:600";
-          link.textContent = "Continue to provider →";
+          link.textContent = lang === "fr" ? "Continuer chez le fournisseur →" : "Continue to provider →";
           popup.append(link);
         }
         marker.bindPopup(popup);
@@ -104,7 +108,7 @@ export function CourseMap({
         });
         L.marker([user.lat, user.lng], { icon })
           .addTo(group)
-          .bindPopup("You are here");
+          .bindPopup(lang === "fr" ? "Vous êtes ici" : "You are here");
         bounds.push([user.lat, user.lng]);
       }
 
@@ -117,7 +121,7 @@ export function CourseMap({
     return () => {
       cancelled = true;
     };
-  }, [courses, user]);
+  }, [courses, user, lang]);
 
   // Tear down the map on unmount.
   useEffect(

@@ -15,6 +15,7 @@ import {
 import type { TeeTimeResult } from "@/lib/types";
 import type { Profile } from "@/lib/useProfile";
 import { formatPrice, formatTime12 } from "@/lib/format";
+import { formatLongDateForLanguage, useLanguage } from "@/lib/i18n";
 import {
   getBookingProvider,
   safeBookingUrl,
@@ -38,14 +39,6 @@ const C = {
   lime: "#c6f24a",
 };
 
-function formatLongDate(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString("en-CA", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 export function BookingModal({
   tee,
   profile,
@@ -68,6 +61,7 @@ export function BookingModal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   const { isConnected } = useProviderConnections();
+  const { lang, t } = useLanguage();
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -134,7 +128,7 @@ export function BookingModal({
   async function emailMe() {
     if (!tee) return;
     if (!EMAIL_RE.test(email.trim()))
-      return setEmailError("Please enter a valid email address");
+      return setEmailError(t.booking.invalidEmail);
     setEmailError("");
     setEmailState("sending");
     onSaveProfile({ email: email.trim(), name: profile?.name, phone: profile?.phone });
@@ -162,7 +156,7 @@ export function BookingModal({
       } | null;
       if (!response.ok || !result?.delivered) {
         throw new Error(
-          result?.note ?? result?.error ?? "The email could not be delivered.",
+          result?.note ?? result?.error ?? t.booking.emailFailed,
         );
       }
       setEmailState("sent");
@@ -171,7 +165,7 @@ export function BookingModal({
       setEmailError(
         error instanceof Error
           ? error.message
-          : "Couldn't send the details — try again.",
+          : t.booking.emailTryAgain,
       );
     }
   }
@@ -211,13 +205,12 @@ export function BookingModal({
             style={{ backgroundColor: C.surface, borderColor: C.line }}
           >
             <p id="booking-modal-description" className="sr-only">
-              Review this tee time and continue to the provider to complete the
-              reservation.
+              {t.booking.srDescription}
             </p>
             <button
               ref={closeButtonRef}
               onClick={onClose}
-              aria-label="Close booking details"
+              aria-label={t.booking.close}
               className="absolute right-5 top-5 z-10 rounded-full p-2 transition-colors hover:bg-white/10"
               style={{ color: C.fog }}
             >
@@ -227,7 +220,7 @@ export function BookingModal({
             <div className="p-6 sm:p-8">
               {/* ── Hero: the hour ─────────────────────────────────── */}
               <div className="mb-1 text-sm font-medium uppercase tracking-wider" style={{ color: C.fog }}>
-                {tee.source === "live" ? "Available tee time" : "Estimated tee time"}
+                {tee.source === "live" ? t.booking.available : t.booking.estimated}
               </div>
               <div className="flex items-end gap-3">
                 <span className="font-display text-5xl font-extrabold leading-none" style={{ color: C.lime }}>
@@ -240,7 +233,7 @@ export function BookingModal({
                   className="mb-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
                   style={{ backgroundColor: tee.source === "live" ? C.lime : C.fog, color: C.base }}
                 >
-                  {tee.source === "live" ? "Live" : "Est."}
+                  {tee.source === "live" ? t.booking.live : t.booking.est}
                 </span>
               </div>
               <h2 id="booking-modal-title" className="mt-3 font-display text-2xl font-bold" style={{ color: C.cream }}>
@@ -248,12 +241,12 @@ export function BookingModal({
               </h2>
 
               <div className="mt-4 grid grid-cols-2 gap-4 rounded-2xl p-5" style={{ backgroundColor: C.base }}>
-                <Detail icon={<Calendar size={18} />} label="Date" value={formatLongDate(tee.date)} />
-                <Detail icon={<Clock size={18} />} label="Tee time" value={time} />
-                <Detail icon={<MapPin size={18} />} label="Where" value={`${tee.course.city} · ${tee.course.distanceKm} km`} />
-                <Detail icon={<Users size={18} />} label="Round" value={`${tee.players} players · ${tee.holes} holes`} />
+                <Detail icon={<Calendar size={18} />} label={t.booking.date} value={formatLongDateForLanguage(tee.date, lang)} />
+                <Detail icon={<Clock size={18} />} label={t.booking.teeTime} value={time} />
+                <Detail icon={<MapPin size={18} />} label={t.booking.where} value={`${tee.course.city} · ${tee.course.distanceKm} km`} />
+                <Detail icon={<Users size={18} />} label={t.booking.round} value={`${t.booking.players(tee.players)} · ${t.booking.holes(tee.holes)}`} />
                 <div className="col-span-2 flex items-center justify-between border-t pt-3" style={{ borderColor: C.line }}>
-                  <span className="text-xs" style={{ color: C.fog }}>Green fee · per player</span>
+                  <span className="text-xs" style={{ color: C.fog }}>{t.booking.greenFee}</span>
                   <span className="font-display text-2xl font-extrabold" style={{ color: C.cream }}>
                     {formatPrice(tee.price)}
                   </span>
@@ -264,15 +257,13 @@ export function BookingModal({
               {!opened ? (
                 <>
                   <p className="mt-5 text-sm leading-6" style={{ color: C.fog }}>
-                    {tee.source === "live"
-                      ? `This tee time was available when Fairway last checked. `
-                      : `This is a generated planning estimate, not confirmed availability. Check actual times and prices with the provider. `}
+                    {tee.source === "live" ? `${t.booking.liveIntro} ` : `${t.booking.estimateIntro} `}
                     {providerConnected
-                      ? `Your ${providerName} account is marked connected on this device, so this opens the provider booking page in one click. `
+                      ? `${t.booking.connectedIntro(providerName ?? "provider")} `
                       : provider?.contextualHandoff
-                        ? `Your date and round length are included in the booking link. `
-                        : `Check the date, time, player count, and price on the next page. `}
-                    The provider still confirms the reservation and payment.
+                        ? `${t.booking.contextualIntro} `
+                        : `${t.booking.checkIntro} `}
+                    {t.booking.providerConfirms}
                   </p>
                   {handoffUrl ? (
                     <a
@@ -283,27 +274,27 @@ export function BookingModal({
                       className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-display text-lg font-bold transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
                       style={{ backgroundColor: C.lime, color: C.base }}
                     >
-                      {providerConnected ? `Book with ${providerName}` : `Continue on ${providerName}`}
+                      {providerConnected ? t.booking.bookWith(providerName ?? "provider") : t.booking.continueOn(providerName ?? "provider")}
                       <ExternalLink aria-hidden="true" size={20} />
                     </a>
                   ) : (
                     <p className="mt-4 rounded-xl border p-4 text-sm" style={{ borderColor: C.line, color: C.fog }}>
-                      This course does not have a valid booking link yet.
+                      {t.booking.invalidLink}
                     </p>
                   )}
                 </>
               ) : (
                 <div className="mt-5">
                   <div className="mb-3 flex items-center gap-2 font-semibold" style={{ color: C.lime }}>
-                    <Check aria-hidden="true" size={20} /> {providerName} opened
+                    <Check aria-hidden="true" size={20} /> {t.booking.opened(providerName ?? "provider")}
                   </div>
                   <ol className="space-y-2 text-sm" style={{ color: C.fog }}>
-                    <li>1. Check <span style={{ color: C.lime }}>{formatLongDate(tee.date)} at {time}</span></li>
-                    <li>2. {providerConnected ? "Your provider account is already marked connected here" : "Sign in or create your provider account"}</li>
-                    <li>3. Review the total and confirm on the provider page</li>
+                    <li>1. <span style={{ color: C.lime }}>{t.booking.checkStep(formatLongDateForLanguage(tee.date, lang), time)}</span></li>
+                    <li>2. {providerConnected ? t.booking.connectedStep : t.booking.signInStep}</li>
+                    <li>3. {t.booking.confirmStep}</li>
                   </ol>
                   <p className="mt-3 text-xs leading-5" style={{ color: C.fog }}>
-                    No reservation has been made in Fairway. The provider&apos;s confirmation is your proof of booking.
+                    {t.booking.noReservation}
                   </p>
                   <a
                     href={handoffUrl ?? undefined}
@@ -312,7 +303,7 @@ export function BookingModal({
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border py-3 font-semibold transition hover:bg-white/5"
                     style={{ color: C.cream, borderColor: C.line }}
                   >
-                    Reopen {providerName} <ExternalLink aria-hidden="true" size={16} />
+                    {t.booking.reopen(providerName ?? "provider")} <ExternalLink aria-hidden="true" size={16} />
                   </a>
                 </div>
               )}
@@ -321,7 +312,7 @@ export function BookingModal({
               <div className="mt-5 border-t pt-4" style={{ borderColor: C.line }}>
                 {emailState === "sent" ? (
                   <p className="flex items-center gap-2 text-sm" style={{ color: C.lime }}>
-                    <Check size={16} /> Sent to {email.trim()} — check your inbox.
+                    <Check size={16} /> {t.booking.sent(email.trim())}
                   </p>
                 ) : !showEmail ? (
                   <button
@@ -329,12 +320,12 @@ export function BookingModal({
                     className="flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
                     style={{ color: C.fog }}
                   >
-                    <Mail size={16} /> Email me these details too
+                    <Mail size={16} /> {t.booking.emailDetails}
                   </button>
                 ) : (
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <input
-                      aria-label="Email address"
+                      aria-label={t.booking.emailLabel}
                       aria-invalid={Boolean(emailError)}
                       aria-describedby={emailError ? "booking-email-error" : undefined}
                       type="email"
@@ -353,7 +344,7 @@ export function BookingModal({
                       className="h-11 shrink-0 rounded-xl px-5 font-semibold transition hover:brightness-105 disabled:opacity-60"
                       style={{ backgroundColor: C.lime, color: C.base }}
                     >
-                      {emailState === "sending" ? "Sending…" : "Send"}
+                      {emailState === "sending" ? t.booking.sending : t.booking.send}
                     </button>
                   </div>
                 )}

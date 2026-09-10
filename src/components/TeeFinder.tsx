@@ -10,7 +10,6 @@ import { MARKETS } from "@/lib/markets";
 import {
   formatPrice,
   formatTime12,
-  minutesToLabel,
   todayISO,
 } from "@/lib/format";
 import { haversineKm } from "@/lib/geo";
@@ -20,17 +19,23 @@ import type { MapCourse } from "./CourseMap";
 import { selectMapTeeTimes } from "@/lib/map-results";
 import { getBookingProvider, safeBookingUrl } from "@/lib/providers/config";
 import { useProviderConnections } from "@/lib/useProviderConnections";
+import { useLanguage, windowLabel } from "@/lib/i18n";
 
 // Rough driving-time estimate from straight-line distance (metro road factor).
 const driveMinutes = (km: number) => Math.max(1, Math.round(km * 1.2));
 
+function MapLoading() {
+  const { t } = useLanguage();
+  return (
+    <div className="grid h-[360px] w-full place-items-center rounded-2xl border border-line bg-surface/40 text-fog sm:h-[520px] sm:rounded-3xl">
+      {t.search.loadingMap}
+    </div>
+  );
+}
+
 const CourseMap = dynamic(async () => (await import("./CourseMap")).CourseMap, {
   ssr: false,
-  loading: () => (
-    <div className="grid h-[360px] w-full place-items-center rounded-2xl border border-line bg-surface/40 text-fog sm:h-[520px] sm:rounded-3xl">
-      Loading map…
-    </div>
-  ),
+  loading: () => <MapLoading />,
 });
 
 type SortKey =
@@ -57,12 +62,12 @@ type SearchValues = {
   sort: SortKey;
 };
 
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: "price-desc", label: "Price: high → low" },
-  { key: "price-asc", label: "Price: low → high" },
-  { key: "closest-price", label: "Closest to my budget" },
-  { key: "closest-time", label: "Closest to my time" },
-  { key: "distance", label: "Nearest to me" },
+const SORTS: SortKey[] = [
+  "price-desc",
+  "price-asc",
+  "closest-price",
+  "closest-time",
+  "distance",
 ];
 
 function defaultSearchDate() {
@@ -103,9 +108,11 @@ export function TeeFinder() {
 
   const { profile, save, clear } = useProfile();
   const { isConnected: isProviderConnected } = useProviderConnections();
+  const { lang, t } = useLanguage();
   const [bookingTee, setBookingTee] = useState<TeeTimeResult | null>(null);
   const marketConfig = MARKETS[market];
   const regionOptions = MARKET_REGIONS[market];
+  const marketArea = t.search.marketArea[market] ?? marketConfig.areaLabel;
 
   // Location + view
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -115,7 +122,7 @@ export function TeeFinder() {
 
   const useMyLocation = useCallback(() => {
     if (!("geolocation" in navigator)) {
-      setGeoError("Location isn't available in this browser.");
+      setGeoError(t.search.locationUnavailable);
       return;
     }
     setGeoBusy(true);
@@ -126,12 +133,12 @@ export function TeeFinder() {
         setGeoBusy(false);
       },
       () => {
-        setGeoError("Couldn't get your location — allow it and try again.");
+        setGeoError(t.search.locationError);
         setGeoBusy(false);
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     );
-  }, []);
+  }, [t.search.locationError, t.search.locationUnavailable]);
 
   const runSearch = useCallback(
     async (scroll = false, ov?: Partial<SearchValues>) => {
@@ -172,7 +179,7 @@ export function TeeFinder() {
 
       try {
         const res = await fetch(`/api/tee-times?${params.toString()}`, { signal: controller.signal });
-        if (!res.ok) throw new Error((await res.json()).error ?? "Search failed");
+        if (!res.ok) throw new Error((await res.json()).error ?? t.search.genericError);
         const json: SearchResponse = await res.json();
         if (requestRef.current !== controller) return;
         setData(json);
@@ -186,12 +193,12 @@ export function TeeFinder() {
         if (requestRef.current !== controller) return;
         if (e instanceof DOMException && e.name === "AbortError") return;
         setData(null);
-        setError(e instanceof TypeError ? "We couldn't reach the tee-time service. Please try again." : e instanceof Error ? e.message : "Something went wrong");
+        setError(e instanceof TypeError ? t.search.serviceError : e instanceof Error ? e.message : t.search.genericError);
       } finally {
         if (requestRef.current === controller) setLoading(false);
       }
     },
-    [date, market, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, liveOnly, sort],
+    [date, market, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, liveOnly, sort, t.search.genericError, t.search.serviceError],
   );
 
   // initial load so the page is never empty
@@ -268,10 +275,10 @@ export function TeeFinder() {
         transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
         className="mb-7 grid gap-4 sm:mb-9 lg:grid-cols-[.7fr_1.3fr] lg:items-end"
       >
-        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Search {marketConfig.areaLabel}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">{t.search.eyebrow(marketArea)}</p>
         <div>
-          <h2 className="font-display text-4xl font-semibold leading-[.92] tracking-[-.035em] sm:text-6xl">Your time. Your price.<br />Every fairway.</h2>
-          <p className="mt-3 max-w-xl text-base leading-7 text-fog sm:mt-4">Compare every useful option first. Provider-confirmed slots appear live, and estimates stay clearly labeled.</p>
+          <h2 className="whitespace-pre-line font-display text-4xl font-semibold leading-[.92] tracking-[-.035em] sm:text-6xl">{t.search.title}</h2>
+          <p className="mt-3 max-w-xl text-base leading-7 text-fog sm:mt-4">{t.search.body}</p>
         </div>
       </motion.div>
 
@@ -300,30 +307,30 @@ export function TeeFinder() {
                 {MARKETS[id].shortLabel}
               </span>
               <span className="mt-1 block font-display text-xl font-semibold leading-none sm:text-2xl">
-                {MARKETS[id].areaLabel}
+                {t.search.marketArea[id] ?? MARKETS[id].areaLabel}
               </span>
             </button>
           ))}
         </div>
         <div className="mb-7 flex flex-col gap-3 rounded-2xl bg-base px-4 py-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-cream">Availability quality</p>
+            <p className="text-sm font-semibold text-cream">{t.search.availabilityTitle}</p>
             <p className="mt-0.5 text-xs text-fog">
               {liveOnly
-                ? "Only provider-confirmed slots are shown. Include estimates when providers have not opened their sheets yet."
-                : "Showing live slots plus labeled estimates. Switch to live-only when you want provider-confirmed inventory only."}
+                ? t.search.liveOnlyBody
+                : t.search.liveEstimateBody}
             </p>
           </div>
           <button type="button" onClick={() => setLiveOnly((value) => !value)} aria-pressed={!liveOnly} className={`inline-flex min-h-11 w-full items-center justify-center gap-3 rounded-full border px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] transition sm:w-auto sm:justify-between ${!liveOnly ? "border-forest bg-forest text-white" : "border-line bg-surface text-fog hover:border-forest"}`}>
             <span className={`h-2 w-2 rounded-full ${!liveOnly ? "bg-lime" : "bg-fog/40"}`} />
-            {liveOnly ? "Live only" : "Live + estimates"}
+            {liveOnly ? t.search.liveOnly : t.search.liveEstimates}
           </button>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
-          <Field label="Date">
+          <Field label={t.search.date}>
             <input
               type="date"
-              aria-label="Date"
+              aria-label={t.search.date}
               value={date}
               min={todayISO()}
               onChange={(e) => setDate(e.target.value)}
@@ -331,17 +338,17 @@ export function TeeFinder() {
             />
           </Field>
 
-          <Field label="I want to play around">
+          <Field label={t.search.preferredTime}>
             <input
               type="time"
-              aria-label="Preferred tee time"
+              aria-label={t.search.preferredTime}
               value={time}
               onChange={(e) => setTime(e.target.value)}
               className="input"
             />
           </Field>
 
-          <Field label="Players">
+          <Field label={t.search.players}>
             <div className="flex gap-2">
               {[1, 2, 3, 4].map((p) => (
                 <button
@@ -367,8 +374,8 @@ export function TeeFinder() {
           <div>
             <div className="mb-2 flex items-baseline justify-between">
               <label className="text-sm font-medium text-cream">
-                Flexible by{" "}
-                <span className="text-forest">±{minutesToLabel(windowMinutes)}</span>
+                {t.search.flexibleBy}{" "}
+                <span className="text-forest">±{windowLabel(windowMinutes, lang)}</span>
               </label>
               <span className="text-xs text-fog">
                 {formatTime12(toHHMM(Math.max(0, parseInt(time.split(":")[0]) * 60 + parseInt(time.split(":")[1]) - windowMinutes)))}{" "}
@@ -378,7 +385,7 @@ export function TeeFinder() {
             </div>
             <input
               type="range"
-              aria-label="Time flexibility in minutes"
+              aria-label={t.search.flexibleBy}
               min={0}
               max={180}
               step={15}
@@ -389,7 +396,7 @@ export function TeeFinder() {
           </div>
 
           {/* Holes */}
-          <Field label="Holes">
+          <Field label={t.search.holes}>
             <div className="flex gap-2">
               {(["any", "18", "9"] as const).map((h) => (
                 <button
@@ -403,7 +410,7 @@ export function TeeFinder() {
                       : "border-line bg-base-2 text-fog hover:border-lime-soft"
                   }`}
                 >
-                  {h === "any" ? "Any" : `${h} holes`}
+                  {h === "any" ? t.search.any : t.search.holesValue(h)}
                 </button>
               ))}
             </div>
@@ -421,7 +428,7 @@ export function TeeFinder() {
                   onChange={(e) => setUseTarget(e.target.checked)}
                   className="accent-lime"
                 />
-                Target budget
+                {t.search.targetBudget}
               </label>
               <span className="font-display text-lg font-bold text-forest">
                 {formatPrice(targetPrice)}
@@ -431,7 +438,7 @@ export function TeeFinder() {
               type="range"
               min={20}
               max={200}
-              aria-label="Target budget per player"
+              aria-label={t.search.targetBudget}
               step={5}
               value={targetPrice}
               disabled={!useTarget}
@@ -442,7 +449,7 @@ export function TeeFinder() {
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-medium text-cream">Hard ceiling</label>
+              <label className="text-sm font-medium text-cream">{t.search.hardCeiling}</label>
               <span className="font-display text-lg font-bold text-cream">
                 {formatPrice(maxPrice)}
               </span>
@@ -451,7 +458,7 @@ export function TeeFinder() {
               type="range"
               min={20}
               max={250}
-              aria-label="Maximum price per player"
+              aria-label={t.search.hardCeiling}
               step={5}
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
@@ -463,7 +470,7 @@ export function TeeFinder() {
         {/* Regions */}
         <div className="mt-7">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <label className="block text-sm font-medium text-cream">Regions</label>
+            <label className="block text-sm font-medium text-cream">{t.search.regions}</label>
             <button
               type="button"
               onClick={() => setPublicOnly((v) => !v)}
@@ -481,12 +488,12 @@ export function TeeFinder() {
               >
                 {publicOnly ? "✓" : ""}
               </span>
-              Public courses only
+              {t.search.publicOnly}
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
             <Chip active={regions.length === 0} onClick={() => setRegions([])}>
-              All regions
+              {t.search.allRegions}
             </Chip>
             {regionOptions.map((r) => (
               <Chip key={r} active={regions.includes(r)} onClick={() => toggleRegion(r)}>
@@ -504,7 +511,7 @@ export function TeeFinder() {
             className="group relative h-14 flex-1 overflow-hidden rounded-2xl bg-forest text-lg font-bold text-white transition hover:bg-forest-soft disabled:opacity-60"
           >
             <span className="relative z-10">
-              {loading ? "Searching the fairways…" : "Find my tee times"}
+              {loading ? t.search.loadingButton : t.search.submit}
             </span>
           </button>
         </div>
@@ -532,8 +539,7 @@ export function TeeFinder() {
         {data && (
           <motion.div
             initial={{ opacity: 0, y: 22 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, amount: 0.12 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             className={`mt-8 transition-opacity sm:mt-10 ${loading ? "pointer-events-none opacity-50" : ""}`}
             aria-busy={loading}
@@ -542,27 +548,26 @@ export function TeeFinder() {
               <div className="pointer-events-none sticky top-24 z-20 mb-4 flex justify-center">
                 <span className="inline-flex items-center gap-2 rounded-full border border-forest/30 bg-surface/95 px-4 py-2 text-sm font-semibold text-forest shadow-lg backdrop-blur">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-lime/30 border-t-lime" />
-                  Updating tee times…
+                  {t.search.updating}
                 </span>
               </div>
             )}
             <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h3 className="font-display text-2xl font-bold">
-                  {data.meta.total} tee {data.meta.total === 1 ? "time" : "times"}
-                  <span className="text-fog"> · {data.meta.courses} {data.meta.courses === 1 ? "course" : "courses"}</span>
+                  {t.search.resultHeading(data.meta.total, data.meta.courses)}
                 </h3>
                 <p className="mt-1 text-sm text-fog">
                   {data.meta.cheapest != null && (
                     <>
-                      {data.meta.liveRows === 0 ? "Estimated from" : "From"}{" "}
+                      {t.search.rangeFrom(data.meta.liveRows)}{" "}
                       <span className="font-semibold text-forest">{formatPrice(data.meta.cheapest)}</span>{" "}
-                      to {formatPrice(data.meta.priciest ?? 0)} ·{" "}
+                      {lang === "fr" ? "à" : "to"} {formatPrice(data.meta.priciest ?? 0)} ·{" "}
                     </>
                   )}
                   {data.meta.total === 0
-                    ? "No results match this search. Availability can change; check again or adjust your filters."
-                    : `${data.meta.liveRows} live provider ${data.meta.liveRows === 1 ? "slot" : "slots"}${data.meta.total > data.meta.liveRows ? ` · ${data.meta.total - data.meta.liveRows} generated estimates` : ""}`}
+                    ? t.search.noResultsMeta
+                    : t.search.resultSummary(data.meta.liveRows, data.meta.total)}
                 </p>
               </div>
 
@@ -576,10 +581,10 @@ export function TeeFinder() {
                       ? "border-forest bg-forest text-white"
                       : "border-line bg-base-2 text-fog hover:border-lime-soft hover:text-cream"
                   }`}
-                  title="Sort and measure by distance from where you are"
+                  title={t.search.useLocationTitle}
                 >
                   <span aria-hidden>📍</span>
-                  {geoBusy ? "Locating…" : userLoc ? "Using your location" : "Use my location"}
+                  {geoBusy ? t.search.locating : userLoc ? t.search.usingLocation : t.search.useLocation}
                 </button>
 
                 <div className="flex h-11 items-center rounded-xl border border-line bg-base-2 p-1">
@@ -593,7 +598,7 @@ export function TeeFinder() {
                         view === v ? "bg-forest text-white" : "text-fog hover:text-cream"
                       }`}
                     >
-                      {v}
+                      {v === "list" ? t.search.list : t.search.map}
                     </button>
                   ))}
                 </div>
@@ -603,20 +608,20 @@ export function TeeFinder() {
                     <span className="h-1.5 w-1.5 rounded-full bg-lime" />
                     {profile.email}
                     <button onClick={clear} className="text-fog/70 underline-offset-2 hover:text-cream hover:underline">
-                      change
+                      {t.search.change}
                     </button>
                   </span>
                 ) : null}
                 <label className="flex items-center gap-2 text-sm text-fog">
-                  Sort
+                  {t.search.sort}
                   <select
                     value={sort}
                     onChange={(e) => setSort(e.target.value as SortKey)}
                     className="h-11 rounded-xl border border-line bg-base-2 px-3 text-cream outline-none focus:border-lime"
                   >
-                    {SORTS.map((s) => (
-                      <option key={s.key} value={s.key}>
-                        {s.label}
+                    {SORTS.map((key) => (
+                      <option key={key} value={key}>
+                        {t.search.sortLabels[key]}
                       </option>
                     ))}
                   </select>
@@ -636,26 +641,26 @@ export function TeeFinder() {
                 className="mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-lime/30 bg-lime/[0.06] px-4 py-3 text-left transition hover:border-lime/60"
               >
                 <span className="text-sm text-cream">
-                  📍 Closest to you:{" "}
+                  📍 {t.search.closest}:{" "}
                   <span className="font-semibold">{nearest.name}</span>
                   <span className="text-fog">
                     {" "}
-                    · {nearest.distanceKm} km · ~{nearest.driveMin} min drive
-                    {nearest.live ? " · live now" : ""}
+                    · {nearest.distanceKm} km · ~{nearest.driveMin} min{lang === "fr" ? " de route" : " drive"}
+                    {nearest.live ? ` · ${t.search.liveNow}` : ""}
                   </span>
                 </span>
                 <span className="shrink-0 text-xs font-semibold text-forest">
-                  Sort by nearest →
+                  {t.search.sortNearest}
                 </span>
               </button>
             )}
 
             {data.results.length === 0 && !error && (
               <div className="rounded-2xl border border-line bg-surface p-10 text-center text-fog">
-                <p>No {liveOnly ? "live slots" : "results"} match those filters. Try another time, region, or budget.</p>
+                <p>{t.search.noMatches(liveOnly)}</p>
                 {liveOnly && (
                   <button type="button" onClick={() => { setLiveOnly(false); runSearch(true, { liveOnly: false }); }} className="mt-5 rounded-full border border-forest px-5 py-2.5 text-xs font-bold uppercase tracking-[.1em] text-forest transition hover:bg-forest hover:text-white">
-                    Include labeled estimates
+                    {t.search.includeEstimates}
                   </button>
                 )}
               </div>
@@ -665,11 +670,11 @@ export function TeeFinder() {
               <>
                 <CourseMap courses={mapCourses} user={userLoc} />
                 <p className="mt-3 text-center text-xs text-fog">
-                  {mapCourses.length} courses ·{" "}
-                  <span className="font-semibold text-forest">● live</span> vs{" "}
-                  <span className="text-fog">● estimated</span>
-                  {userLoc ? " · blue dot is you" : " · tap “Use my location” to measure distance"}
-                  . Tap a dot for times &amp; booking.
+                  {mapCourses.length} {lang === "fr" ? "parcours" : "courses"} ·{" "}
+                  <span className="font-semibold text-forest">{t.search.liveLegend}</span> vs{" "}
+                  <span className="text-fog">{t.search.estimateLegend}</span>
+                  {" · "}{userLoc ? (lang === "fr" ? "le point bleu, c’est vous" : "blue dot is you") : (lang === "fr" ? "touchez « Utiliser ma position » pour mesurer la distance" : "tap “Use my location” to measure distance")}
+                  {lang === "fr" ? ". Touchez un point pour voir les heures et réserver." : ". Tap a dot for times & booking."}
                 </p>
               </>
             ) : (
@@ -699,8 +704,7 @@ export function TeeFinder() {
 
                 {orderedResults.length > 60 && (
                   <p className="mt-4 text-center text-sm text-fog">
-                    Showing the top 60 of {orderedResults.length}. Tighten your filters
-                    to narrow it down.
+                    {t.search.showingTop(60, orderedResults.length)}
                   </p>
                 )}
               </>
@@ -774,6 +778,7 @@ function ResultCard({
   providerConnected: boolean;
   onBook: () => void;
 }) {
+  const { t } = useLanguage();
   const near = target != null && Math.abs(r.price - target) <= 8;
   const isLive = r.source === "live";
   const fromYouKm =
@@ -808,22 +813,22 @@ function ResultCard({
             </h4>
             {isLive ? (
               <span
-                title="Confirmed on the course's live tee sheet right now"
+                title={t.search.confirmedTitle}
                 className="shrink-0 rounded-full bg-lime/45 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-forest"
               >
-                ● Live
+                {t.search.liveBadge}
               </span>
             ) : (
               <span
-                title="Estimated — this date's live sheet isn't open yet; confirm on the course's site"
+                title={t.search.estimatedTitle}
                 className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog"
               >
-                Est.
+                {t.search.estimateBadge}
               </span>
             )}
             {showConnectedBooking && (
               <span className="shrink-0 rounded-full border border-lime/45 bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
-                Connected
+                {t.search.connectedBadge}
               </span>
             )}
           </div>
@@ -831,13 +836,13 @@ function ResultCard({
             {r.course.city} · {r.course.region} ·{" "}
             {fromYouKm != null ? (
               <span className="text-cream">
-                📍 {fromYouKm} km · ~{driveMinutes(fromYouKm)} min
+                {t.search.distanceFromYou(fromYouKm, driveMinutes(fromYouKm))}
               </span>
             ) : (
               `${r.course.distanceKm} km`
             )}{" "}
-            · {r.holes} holes
-            {r.cart ? " · cart" : ""}
+            · {t.search.holesValue(r.holes)}
+            {r.cart ? ` · ${t.search.cart}` : ""}
           </p>
         </div>
       </div>
@@ -847,7 +852,7 @@ function ResultCard({
           <div className="flex items-center justify-end gap-2">
             {near && (
               <span className="rounded-full bg-lime/45 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-forest">
-                On budget
+                {t.search.onBudget}
               </span>
             )}
             <span className="font-display text-xl font-extrabold text-cream sm:text-2xl">
@@ -857,13 +862,13 @@ function ResultCard({
           <p className="text-xs text-fog">
             {isLive ? (
               <>
-                per player ·{" "}
+                {t.search.perPlayer} ·{" "}
                 <span className="font-semibold text-forest">
-                  {r.players} {r.players === 1 ? "spot" : "spots"} open
+                  {t.search.spotsOpen(r.players)}
                 </span>
               </>
             ) : (
-              "estimated · per player"
+              t.search.estimatedPerPlayer
             )}
           </p>
         </div>
@@ -873,9 +878,9 @@ function ResultCard({
             target="_blank"
             rel="noopener noreferrer"
             className="shrink-0 rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-forest sm:px-5 shadow-[0_10px_24px_rgba(198,242,74,0.22)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime"
-            aria-label={`Book ${r.course.name} with connected ${provider.name} account`}
+            aria-label={t.search.bookWithConnected(r.course.name, provider.name)}
           >
-            Book with {provider.name} ↗
+            {t.search.bookWith(provider.name)}
           </a>
         ) : (
           <button
@@ -887,7 +892,7 @@ function ResultCard({
                 : "border border-forest/40 bg-transparent text-forest hover:bg-forest hover:text-white"
             }`}
           >
-            {isLive ? "Review" : "Check"}
+            {isLive ? t.search.review : t.search.check}
           </button>
         )}
       </div>
