@@ -173,16 +173,17 @@ export function ProviderAccounts() {
                     Connected
                   </button>
                 ) : href ? (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setOpenedKey(connectionKey)}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenedKey(connectionKey);
+                      window.open(href, "_blank", "noopener,noreferrer");
+                    }}
                     className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#153528] px-5 py-3 text-center text-sm font-bold text-[#fffdf7] transition hover:bg-[#214d3a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#153528]"
                   >
                     {action}
                     <ArrowUpRight aria-hidden="true" size={17} />
-                  </a>
+                  </button>
                 ) : (
                   <button
                     type="button"
