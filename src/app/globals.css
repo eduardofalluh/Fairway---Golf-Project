@@ -22,7 +22,6 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 7rem;
   background: var(--color-base);
   color: var(--color-cream);
   -webkit-font-smoothing: antialiased;
@@ -108,6 +107,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline-offset: 3px;
 }
 
+#accounts,
+#search,
+#how,
+#faq {
+  scroll-margin-top: 5.75rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {
@@ -133,7 +139,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 
 @media (max-width: 640px) {
-  html { scroll-padding-top: 6rem; }
+  #accounts,
+  #search,
+  #how,
+  #faq { scroll-margin-top: 5.5rem; }
   body {
     background:
       radial-gradient(520px 320px at 100% 18%, rgba(202, 236, 85, 0.08), transparent 62%),
