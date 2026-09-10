@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fairway · Agent activity</title>
+<style>
+:root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;color:#e6e9e8;background:#101715}*{box-sizing:border-box}body{margin:0}main{max-width:1080px;margin:auto;padding:36px 24px}header{display:flex;align-items:center;justify-content:space-between;gap:20px}h1{font-size:30px;letter-spacing:-1px;margin:4px 0}h2{font-size:18px;margin:0 0 16px}p{margin:8px 0}.eyebrow{color:#b5d889;font-size:13px;letter-spacing:2px;text-transform:uppercase}.muted,small{color:#a1b0a8}small{font-size:13px}.connection{font-size:14px;white-space:nowrap;color:#b5d889}.connection.offline{color:#f1b791}.stats{display:flex;gap:32px;border-block:1px solid #304037;margin:28px 0;padding:20px 0}.stats b{font-size:26px;margin-right:8px}.stats span{color:#a1b0a8;font-size:14px}.layout{display:grid;grid-template-columns:1.25fr 1fr;gap:36px}.card{border:1px solid #304037;border-radius:12px;padding:18px;margin-bottom:12px;background:#17221d}.row{display:flex;gap:12px;justify-content:space-between;align-items:center}.name{font-size:17px;font-weight:600}.badge{font-size:12px;border-radius:6px;padding:3px 8px;text-transform:capitalize;background:#26342c;color:#bcc9c1}.working{background:#33472a;color:#cee8a5}.blocked{background:#473429;color:#f5bc94}.card p{font-size:15px}.card small{display:block;margin-top:12px}.feed{list-style:none;padding:0;margin:0}.feed li{padding:0 0 18px 17px;border-left:1px solid #3e5144}.feed p{font-size:14px;margin:3px 0}.feed strong{font-size:14px}.empty{color:#a1b0a8;padding:20px 0}footer{border-top:1px solid #304037;margin-top:32px;padding-top:18px;color:#a1b0a8;font-size:13px}a{color:#b5d889}#error{color:#f5bc94}button{color:inherit;background:#26342c;border:1px solid #53694f;border-radius:6px;padding:7px 12px;cursor:pointer;font:inherit}button:focus-visible,a:focus-visible{outline:2px solid #cee8a5;outline-offset:4px}@media(max-width:700px){main{padding:24px 18px}.layout{grid-template-columns:1fr;gap:20px}header{align-items:flex-start;flex-direction:column;gap:8px}.stats{gap:20px;flex-wrap:wrap}.stats b{font-size:22px}}@media(prefers-reduced-motion:no-preference){.working{animation:pulse 3s ease-in-out infinite}@keyframes pulse{50%{background:#405c31}}}
+</style>
+<main>
+<header><div><div class="eyebrow">Fairway / Behind the scenes</div><h1>Agent activity</h1><p class="muted">Who is doing what, and what just changed.</p></div><div><div id="connection" class="connection">Connecting…</div><small id="checked">Waiting for the first report</small></div></header>
+<div class="stats"><div><b id="working">0</b><span>working</span></div><div><b id="completed">0</b><span>completed</span></div><div><b id="blocked">0</b><span>blocked</span></div></div>
+<p id="error" role="status"></p>
+<div class="layout"><section><h2>The team</h2><div id="agents" class="empty">Waiting for agent reports…</div></section><section><h2>Recent activity</h2><ol id="events" class="feed"></ol></section></div>
+<footer>Refreshes every 2 seconds. Activity is reported by the coordinator and agents; this shows task summaries, not private reasoning or token estimates. A working status is the last reported state, not a guarantee the agent is still connected. <a href="https://fairway-montreal-eduardo.eduardofalluh.chatgpt.site" target="_blank" rel="noopener">Open Fairway ↗</a></footer>
+</main>
+<script>
+const el=id=>document.getElementById(id);
+const time=value=>new Date(value).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function element(tag,text,cls){const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n;}
+let lastData='';
+function render(data){
+  for(const status of ['working','completed','blocked'])el(status).textContent=data.agents.filter(a=>a.status===status).length;
+  el('agents').className='';el('agents').replaceChildren();
+  const order={working:0,blocked:1,idle:2,completed:3};
+  for(const agent of [...data.agents].sort((a,b)=>order[a.status]-order[b.status])){
+    const card=element('article','','card'),row=element('div','','row');
+    row.append(element('div',agent.name,'name'),element('span',agent.status,'badge '+agent.status));
+    card.append(row,element('small',agent.model),element('p',agent.summary),element('small','Reported '+time(agent.at)));
+    el('agents').append(card);
+  }
+  if(!data.agents.length)el('agents').append(element('p','No agents have reported yet.','empty'));
+  el('events').replaceChildren();
+  for(const event of data.events){const li=element('li','');li.append(element('small',time(event.at)),element('p',event.name+' · '+event.status),element('p',event.summary,'muted'));el('events').append(li);}
+}
+async function refresh(){
+  try{
+    const response=await fetch('/api/state',{cache:'no-store',signal:AbortSignal.timeout(4000)});
+    if(!response.ok)throw Error('Unable to read activity');
+    const data=await response.json(), signature=JSON.stringify([data.agents,data.events]);
+    if(signature!==lastData){render(data);lastData=signature;}
+    el('connection').textContent='● Connected';el('connection').className='connection';
+    el('checked').textContent='Checked '+time(data.checkedAt);el('error').textContent='';
+  }catch{el('connection').textContent='Connection paused';el('connection').className='connection offline';el('error').textContent='The local dashboard server is unavailable. Showing the last received reports; retrying automatically.';}
+  setTimeout(refresh,2000);
+}
+refresh();
+</script>
+</html>

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "agents:dashboard": "node tools/agent-dashboard/server.mjs",
     "dev": "next dev",
     "build": "vinext build",
     "start": "vinext start",
