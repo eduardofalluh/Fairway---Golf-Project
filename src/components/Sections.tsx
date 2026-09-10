@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowUpRight, Flag } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Flag } from "lucide-react";
 import { motion } from "framer-motion";
 import { Reveal, RevealGroup, revealItem } from "./Reveal";
 
@@ -58,18 +58,40 @@ const FAQS = [
 
 export function Faq() {
   return (
-    <section id="faq" className="mx-auto max-w-4xl px-5 py-20 sm:px-8 lg:py-24">
-      <Reveal className="text-center">
-        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Before you tee off</p>
-        <h2 className="mt-4 font-display text-5xl font-semibold tracking-[-.035em] sm:text-6xl">A few good questions.</h2>
+    <section id="faq" className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+      <Reveal className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Before you tee off</p>
+          <h2 className="mt-4 font-display text-5xl font-semibold leading-none tracking-[-.035em] sm:text-6xl">A few good questions.</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-7 text-fog lg:justify-self-end">
+          The app keeps discovery, provider sign-in, and booking handoff together, while final confirmation stays on the provider page.
+        </p>
       </Reveal>
-      <RevealGroup className="mt-12 divide-y divide-line border-y border-line">
-        {FAQS.map((faq) => (
-          <motion.details key={faq.q} variants={revealItem} className="group py-6">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-left text-base font-semibold marker:hidden sm:text-lg">
-              {faq.q}<span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line text-xl font-light transition group-open:rotate-45">+</span>
+      <RevealGroup className="mt-10 grid gap-3" stagger={0.06}>
+        {FAQS.map((faq, index) => (
+          <motion.details
+            key={faq.q}
+            variants={revealItem}
+            className="group rounded-[1.35rem] border border-line bg-surface/70 p-5 shadow-[0_18px_48px_rgba(7,17,11,0.12)] open:bg-surface sm:p-6"
+            open={index === 0}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-5 text-left marker:hidden">
+              <span className="flex min-w-0 items-center gap-4">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-lime/15 text-xs font-bold text-lime">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <span className="font-display text-xl font-semibold leading-tight text-cream sm:text-2xl">
+                  {faq.q}
+                </span>
+              </span>
+              <span className="grid size-10 shrink-0 place-items-center rounded-full border border-line bg-base-2 text-fog transition group-open:rotate-180 group-open:border-lime/50 group-open:text-lime">
+                <ChevronDown aria-hidden="true" size={18} />
+              </span>
             </summary>
-            <p className="max-w-2xl pt-4 text-sm leading-7 text-fog">{faq.a}</p>
+            <p className="ml-0 mt-5 max-w-3xl border-t border-line pt-5 text-sm leading-7 text-fog sm:ml-[3.25rem]">
+              {faq.a}
+            </p>
           </motion.details>
         ))}
       </RevealGroup>

@@ -17,6 +17,8 @@ import { useProfile } from "@/lib/useProfile";
 import { BookingModal } from "./BookingModal";
 import type { MapCourse } from "./CourseMap";
 import { selectMapTeeTimes } from "@/lib/map-results";
+import { getBookingProvider, safeBookingUrl } from "@/lib/providers/config";
+import { useProviderConnections } from "@/lib/useProviderConnections";
 
 // Rough driving-time estimate from straight-line distance (metro road factor).
 const driveMinutes = (km: number) => Math.max(1, Math.round(km * 1.2));
@@ -97,6 +99,7 @@ export function TeeFinder() {
   const [appliedPlayers, setAppliedPlayers] = useState(players);
 
   const { profile, save, clear } = useProfile();
+  const { isConnected: isProviderConnected } = useProviderConnections();
   const [bookingTee, setBookingTee] = useState<TeeTimeResult | null>(null);
 
   // Location + view
@@ -625,6 +628,10 @@ export function TeeFinder() {
                           target={useTarget ? targetPrice : undefined}
                           r={r}
                           userLoc={userLoc}
+                          providerConnected={isProviderConnected(
+                            getBookingProvider(r.bookingUrl).id,
+                            r.bookingUrl,
+                          )}
                           onBook={() => setBookingTee({ ...r, players: appliedPlayers })}
                         />
                       </motion.li>
@@ -699,11 +706,13 @@ function ResultCard({
   r,
   target,
   userLoc,
+  providerConnected,
   onBook,
 }: {
   r: SearchResponse["results"][number];
   target?: number;
   userLoc: { lat: number; lng: number } | null;
+  providerConnected: boolean;
   onBook: () => void;
 }) {
   const near = target != null && Math.abs(r.price - target) <= 8;
@@ -712,6 +721,10 @@ function ResultCard({
     userLoc && typeof r.course.lat === "number"
       ? haversineKm(userLoc.lat, userLoc.lng, r.course.lat, r.course.lng)
       : null;
+  const provider = getBookingProvider(r.bookingUrl);
+  const handoffUrl = safeBookingUrl(r.bookingUrl);
+  const showConnectedBooking =
+    providerConnected && provider.id !== "course" && Boolean(handoffUrl);
   return (
     <div
       className={`group flex flex-col gap-4 rounded-2xl border p-5 transition hover:bg-surface sm:flex-row sm:items-center ${
@@ -747,6 +760,11 @@ function ResultCard({
                 className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog"
               >
                 Est.
+              </span>
+            )}
+            {showConnectedBooking && (
+              <span className="shrink-0 rounded-full border border-lime/45 bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+                Connected
               </span>
             )}
           </div>
@@ -790,17 +808,29 @@ function ResultCard({
             )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onBook}
-          className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-            isLive
-              ? "bg-forest text-white hover:bg-forest-soft"
-              : "border border-forest/40 bg-transparent text-forest hover:bg-forest hover:text-white"
-          }`}
-        >
-          {isLive ? "Book" : "Check"}
-        </button>
+        {showConnectedBooking ? (
+          <a
+            href={handoffUrl ?? undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 rounded-xl bg-lime px-5 py-2.5 text-sm font-bold text-forest shadow-[0_10px_24px_rgba(198,242,74,0.22)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime"
+            aria-label={`Book ${r.course.name} with connected ${provider.name} account`}
+          >
+            Book with {provider.name} ↗
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={onBook}
+            className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+              isLive
+                ? "bg-forest text-white hover:bg-forest-soft"
+                : "border border-forest/40 bg-transparent text-forest hover:bg-forest hover:text-white"
+            }`}
+          >
+            {isLive ? "Review" : "Check"}
+          </button>
+        )}
       </div>
     </div>
   );

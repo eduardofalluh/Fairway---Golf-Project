@@ -19,6 +19,7 @@ import {
   getBookingProvider,
   safeBookingUrl,
 } from "@/lib/providers/config";
+import { useProviderConnections } from "@/lib/useProviderConnections";
 
 // Booking is intentionally a clean hand-off, not an auto-booking: one tap takes
 // the golfer to the provider page, where they verify the details, sign in, and
@@ -66,6 +67,7 @@ export function BookingModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
+  const { isConnected } = useProviderConnections();
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -179,6 +181,9 @@ export function BookingModal({
   const handoffUrl = tee ? safeBookingUrl(tee.bookingUrl) : null;
   const providerName =
     provider?.id === "course" ? tee?.course.name : provider?.name;
+  const providerConnected = Boolean(
+    tee && provider && provider.id !== "course" && isConnected(provider.id, tee.bookingUrl),
+  );
 
   return (
     <AnimatePresence>
@@ -262,10 +267,12 @@ export function BookingModal({
                     {tee.source === "live"
                       ? `This tee time was available when Fairway last checked. `
                       : `This is a generated planning estimate, not confirmed availability. Check actual times and prices with the provider. `}
-                    {provider?.contextualHandoff
-                      ? `Your date and round length are included in the booking link. `
-                      : `Check the date, time, player count, and price on the next page. `}
-                    Sign in and confirm with {providerName}; your spot is not reserved yet.
+                    {providerConnected
+                      ? `Your ${providerName} account is marked connected on this device, so this opens the provider booking page in one click. `
+                      : provider?.contextualHandoff
+                        ? `Your date and round length are included in the booking link. `
+                        : `Check the date, time, player count, and price on the next page. `}
+                    The provider still confirms the reservation and payment.
                   </p>
                   {handoffUrl ? (
                     <a
@@ -276,7 +283,7 @@ export function BookingModal({
                       className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-display text-lg font-bold transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
                       style={{ backgroundColor: C.lime, color: C.base }}
                     >
-                      Continue on {providerName}
+                      {providerConnected ? `Book with ${providerName}` : `Continue on ${providerName}`}
                       <ExternalLink aria-hidden="true" size={20} />
                     </a>
                   ) : (
@@ -292,7 +299,7 @@ export function BookingModal({
                   </div>
                   <ol className="space-y-2 text-sm" style={{ color: C.fog }}>
                     <li>1. Check <span style={{ color: C.lime }}>{formatLongDate(tee.date)} at {time}</span></li>
-                    <li>2. Sign in or create your provider account</li>
+                    <li>2. {providerConnected ? "Your provider account is already marked connected here" : "Sign in or create your provider account"}</li>
                     <li>3. Review the total and confirm on the provider page</li>
                   </ol>
                   <p className="mt-3 text-xs leading-5" style={{ color: C.fog }}>

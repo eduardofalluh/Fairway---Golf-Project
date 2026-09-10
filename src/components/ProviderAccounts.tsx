@@ -1,56 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ArrowUpRight, CheckCircle2, KeyRound, ShieldCheck } from "lucide-react";
 import {
   GGGOLF_CLUB_PORTALS,
   PROVIDER_ACCOUNT_LINKS,
 } from "@/lib/providers/config";
-
-const CONNECTED_STORAGE_KEY = "fairway-provider-connections";
+import { providerConnectionKey } from "@/lib/provider-connections";
+import { useProviderConnections } from "@/lib/useProviderConnections";
 
 export function ProviderAccounts() {
   const [openedKey, setOpenedKey] = useState<string | null>(null);
-  const [connectedKeys, setConnectedKeys] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = window.localStorage.getItem(CONNECTED_STORAGE_KEY);
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
   const [gggolfPortal, setGggolfPortal] = useState("");
-
-  const connectedSet = useMemo(() => new Set(connectedKeys), [connectedKeys]);
-  const connectedCount = connectedKeys.length;
-
-  const saveConnected = (key: string) => {
-    setConnectedKeys((current) => {
-      const next = Array.from(new Set([...current, key]));
-      try {
-        window.localStorage?.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // Some privacy contexts disable localStorage; keep the in-page state.
-      }
-      return next;
-    });
-    setOpenedKey(null);
-  };
-
-  const removeConnected = (key: string) => {
-    setConnectedKeys((current) => {
-      const next = current.filter((item) => item !== key);
-      try {
-        window.localStorage?.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // Some privacy contexts disable localStorage; keep the in-page state.
-      }
-      return next;
-    });
-    setOpenedKey(null);
-  };
+  const { connectedCount, isConnected, saveConnection, removeConnection } =
+    useProviderConnections();
 
   return (
     <section
@@ -98,16 +61,14 @@ export function ProviderAccounts() {
               provider.id === "gggolf" && selectedClub
                 ? `Sign in · ${selectedClub.name}`
                 : provider.action;
-            const connectionKey = href
-              ? `${provider.id}:${href}`
-              : `${provider.id}:pending`;
-            const isConnected = href ? connectedSet.has(connectionKey) : false;
+            const connectionKey = providerConnectionKey(provider.id, href);
+            const providerConnected = href ? isConnected(provider.id, href) : false;
             const wasOpened = openedKey === connectionKey;
             return (
               <article
                 key={provider.id}
                 className={`rounded-[1.75rem] border p-6 shadow-[0_18px_55px_rgba(21,53,40,0.08)] sm:p-8 ${
-                  isConnected
+                  providerConnected
                     ? "border-[#9eb58b] bg-[#f8fff1]"
                     : "border-[#cbd3c7] bg-[#fffdf7]"
                 }`}
@@ -118,17 +79,17 @@ export function ProviderAccounts() {
                   </span>
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
-                      isConnected
+                      providerConnected
                         ? "border-[#88a56e] bg-[#e9f8d6] text-[#2d5d21]"
                         : "border-[#cbd3c7] text-[#547164]"
                     }`}
                   >
-                    {isConnected ? (
+                    {providerConnected ? (
                       <CheckCircle2 aria-hidden="true" size={14} />
                     ) : (
                       <ShieldCheck aria-hidden="true" size={14} />
                     )}{" "}
-                    {isConnected ? "Live · Connected" : "Provider hosted"}
+                    {providerConnected ? "Live · Connected" : "Provider hosted"}
                   </span>
                 </div>
                 <h3 className="mt-7 font-display text-2xl font-bold">
@@ -163,7 +124,7 @@ export function ProviderAccounts() {
                     </select>
                   </div>
                 )}
-                {isConnected ? (
+                {providerConnected ? (
                   <button
                     type="button"
                     disabled
@@ -193,19 +154,19 @@ export function ProviderAccounts() {
                     Choose a club to sign in
                   </button>
                 )}
-                {wasOpened && !isConnected && href && (
+                {wasOpened && !providerConnected && href && (
                   <button
                     type="button"
-                    onClick={() => saveConnected(connectionKey)}
+                    onClick={() => saveConnection(provider.id, href)}
                     className="mt-3 flex min-h-11 w-full items-center justify-center rounded-full border border-[#9eb58b] bg-[#f2fae6] px-5 py-2.5 text-center text-sm font-bold text-[#2d5d21] transition hover:bg-[#e6f6d0]"
                   >
                     I&apos;m logged in
                   </button>
                 )}
-                {isConnected && (
+                {providerConnected && (
                   <button
                     type="button"
-                    onClick={() => removeConnected(connectionKey)}
+                    onClick={() => removeConnection(provider.id, href)}
                     className="mt-3 block w-full text-center text-sm text-[#547164] underline underline-offset-4"
                   >
                     Disconnect on this device
@@ -225,7 +186,7 @@ export function ProviderAccounts() {
                   className="mt-3 text-center text-xs text-[#6f8178]"
                   aria-live="polite"
                 >
-                  {isConnected
+                  {providerConnected
                     ? `${provider.name} is marked connected on this device.`
                     : wasOpened
                       ? `Confirm once you are signed in so Fairway can mark ${provider.name} as connected here.`

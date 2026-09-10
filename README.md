@@ -16,9 +16,11 @@ continue to the course's booking provider.
   browser sessions, or claim the accounts are linked. Users can mark a provider
   as connected on their own device after signing in, which changes the account
   card to a disabled connected state.
-- Selecting a result opens a review panel. The provider confirms availability,
-  the final price and the reservation. Fairway does not make reservations or
-  payments; `/api/autobook` returns HTTP 501.
+- Connected providers unlock direct `Book with {Provider}` actions on matching
+  tee-time cards. Chronogolf and MinuteGolf connections apply provider-wide;
+  GGGolf connections apply to the selected club portal. The provider still
+  confirms availability, final price, payment, and the reservation. Fairway does
+  not make reservations or payments; `/api/autobook` returns HTTP 501.
 - Optional email is a selected-round reminder, never a booking confirmation.
   The UI only reports delivery if the email service accepts it.
 
