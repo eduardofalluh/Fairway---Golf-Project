@@ -5,6 +5,7 @@ import {
 } from "./providers/chronogolf";
 import { generateEstimatedTeeTimes } from "./providers/seed";
 import type { GolfCourse, SearchQuery, TeeTime, TeeTimeResult } from "./types";
+import { todayISO } from "./format";
 
 export function parseTimeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -43,8 +44,17 @@ const norm = (s: string) =>
 export async function getDirectory(): Promise<GolfCourse[]> {
   const live = await getChronogolfCourses();
   const liveNames = new Set(live.map((c) => norm(c.name)));
+  const curatedByName = new Map(EXTRA_COURSES.map((c) => [norm(c.name), c]));
+  const directory = live.map((course) => {
+    const curated = curatedByName.get(norm(course.name));
+    // Directory-only Chronogolf entries must not hide a verified booking portal.
+    if (!course.online && curated) return {
+      ...curated, id: course.id, photo: course.photo ?? curated.photo,
+    };
+    return course;
+  });
   const extras = EXTRA_COURSES.filter((e) => !liveNames.has(norm(e.name)));
-  return [...live, ...extras].sort((a, b) => a.distanceKm - b.distanceKm);
+  return [...directory, ...extras].sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
 /** Apply course-level filters BEFORE fetching tee times to limit live calls. */
@@ -113,8 +123,14 @@ export function applySearch(
   const desired = parseTimeToMinutes(query.desiredTime);
   const window = query.windowMinutes;
   const results: TeeTimeResult[] = [];
+  const today = todayISO();
+  const localTime = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date());
+  const currentMinutes = parseTimeToMinutes(localTime);
 
   for (const t of teeTimes) {
+    if (t.date < today || (t.date === today && t.minutes <= currentMinutes)) continue;
     if (Math.abs(t.minutes - desired) > window) continue;
     if (t.players < query.players) continue;
     if (query.holes && query.holes !== "any") {

@@ -1,122 +1,64 @@
 "use client";
 
-import { useRef } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
-import {
-  Search,
-  TrendingDown,
-  Clock,
-  Wallet,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowDownRight, BadgeDollarSign, Clock3, Layers3 } from "lucide-react";
 import { Reveal } from "./Reveal";
-import { Tilt3D } from "./Tilt3D";
 
-interface Feature {
-  icon: LucideIcon;
-  title: string;
-  body: string;
-  span?: string;
-}
-
-const FEATURES: Feature[] = [
+const FEATURES = [
   {
-    icon: Search,
-    title: "One search, every course",
-    body: "We aggregate live tee times across all of Greater Montréal — not just the courses that pay to be on Chronogolf. One search covers the whole metro.",
-    span: "md:col-span-2",
+    icon: Layers3,
+    title: "The market in one view",
+    body: "See available rounds from supported booking platforms without juggling tabs.",
   },
   {
-    icon: TrendingDown,
-    title: "Prices, sorted your way",
-    body: "Sort high→low, or pin a target budget and we surface the closest matches first.",
+    icon: BadgeDollarSign,
+    title: "Compare the real price",
+    body: "Sort by green fee, budget fit, time, or distance before you commit.",
   },
   {
-    icon: Clock,
-    title: "Your time, your window",
-    body: "Pick a tee time and how flexible you are — ±15 min to ±3 hours — and we scan everything inside it.",
-  },
-  {
-    icon: Wallet,
-    title: "Book direct, no markup",
-    body: "You book at the course's own price. Fairway never adds a fee.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Live availability check",
-    body: "Before we hand you off, we verify the slot is really still open on the course's live sheet.",
+    icon: Clock3,
+    title: "Search on your schedule",
+    body: "Choose an exact time or widen the window when the round matters more than the hour.",
   },
 ];
 
 export function Features() {
   return (
-    <section className="mx-auto max-w-[1600px] px-5 lg:px-10 py-24">
-      <Reveal>
-        <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-lime">
-          Why Fairway
-        </p>
-        <h2 className="max-w-2xl font-display text-4xl font-bold sm:text-5xl">
-          Everything you need to get on the course.
-        </h2>
-      </Reveal>
+    <section className="mx-auto max-w-[1440px] px-5 py-20 sm:px-8 lg:px-10 lg:py-28">
+      <div className="grid items-stretch gap-8 lg:grid-cols-[1.02fr_.98fr]">
+        <Reveal className="relative min-h-[420px] overflow-hidden rounded-[2rem] bg-forest lg:min-h-[580px]">
+          <Image src="/cta.jpg" alt="Golf ball on a tee in warm evening light" fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
+          <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(7,31,22,.86),rgba(7,31,22,.04)_70%)]" />
+          <div className="absolute inset-x-0 bottom-0 p-7 text-white sm:p-10">
+            <span className="text-[10px] font-bold uppercase tracking-[.22em] text-lime">Made for the spontaneous round</span>
+            <p className="mt-3 max-w-md font-display text-4xl font-semibold leading-[.95] sm:text-5xl">More time playing. Less time searching.</p>
+          </div>
+        </Reveal>
 
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
-        {FEATURES.map((f, i) => (
-          <BentoCard key={f.title} feature={f} index={i} />
-        ))}
-      </div>
-    </section>
-  );
-}
+        <div className="flex flex-col justify-between rounded-[2rem] border border-line bg-surface p-7 sm:p-10 lg:p-12">
+          <Reveal>
+            <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Why Fairway</p>
+            <h2 className="mt-4 max-w-lg font-display text-5xl font-semibold leading-[.9] tracking-[-.035em] sm:text-6xl">One search.<br />A clearer choice.</h2>
+          </Reveal>
 
-function BentoCard({ feature, index }: { feature: Feature; index: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  function onMove(e: React.MouseEvent<HTMLDivElement>) {
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    el.style.setProperty("--mx", `${e.clientX - rect.left}px`);
-    el.style.setProperty("--my", `${e.clientY - rect.top}px`);
-  }
-
-  const Icon = feature.icon;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 28, filter: "blur(6px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.6, delay: index * 0.07, ease: [0.16, 1, 0.3, 1] }}
-      className={feature.span ?? ""}
-    >
-      <Tilt3D className="h-full">
-        <div
-          ref={ref}
-          onMouseMove={onMove}
-          className="group relative h-full overflow-hidden rounded-3xl border border-line bg-surface/50 p-7"
-        >
-          {/* mouse-follow spotlight */}
-          <div
-            className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-            style={{
-              background:
-                "radial-gradient(380px circle at var(--mx) var(--my), rgba(198,242,74,0.14), transparent 60%)",
-            }}
-          />
-          {/* hover border glow */}
-          <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-transparent transition group-hover:ring-lime-soft/40" />
-
-          <div className="relative z-10" style={{ transform: "translateZ(40px)" }}>
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-base-2 text-lime ring-1 ring-line transition group-hover:ring-lime-soft/50">
-              <Icon size={22} />
-            </span>
-            <h3 className="mt-5 font-display text-xl font-bold text-cream">{feature.title}</h3>
-            <p className="mt-2 max-w-md text-fog">{feature.body}</p>
+          <div className="mt-12 divide-y divide-line">
+            {FEATURES.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <motion.article key={feature.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }} transition={{ duration: .5, delay: index * .07 }} className="grid grid-cols-[42px_1fr_auto] gap-4 py-6 first:pt-0 last:pb-0">
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-base-2 text-forest"><Icon size={18} /></span>
+                  <div>
+                    <h3 className="font-semibold text-cream">{feature.title}</h3>
+                    <p className="mt-1 max-w-sm text-sm leading-relaxed text-fog">{feature.body}</p>
+                  </div>
+                  <ArrowDownRight size={18} className="mt-1 text-fog/55" />
+                </motion.article>
+              );
+            })}
           </div>
         </div>
-      </Tilt3D>
-    </motion.div>
+      </div>
+    </section>
   );
 }

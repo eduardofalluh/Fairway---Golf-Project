@@ -18,6 +18,8 @@ export function useProfile() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
+      // Hydrate browser-only saved contact details after the server render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setProfile(JSON.parse(raw));
     } catch {
       /* ignore */

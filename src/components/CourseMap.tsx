@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Map as LMap, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { safeBookingUrl } from "@/lib/providers/config";
 
 export type MapCourse = {
   id: string;
@@ -67,18 +68,29 @@ export function CourseMap({
           fillColor: c.live ? "#c6f24a" : "#9fb7a8",
           fillOpacity: c.live ? 0.95 : 0.7,
         }).addTo(group);
-        const dist =
-          c.distanceKm != null
-            ? `<div style="color:#9fb7a8">${c.distanceKm} km · ~${c.driveMin} min drive from you</div>`
-            : "";
-        marker.bindPopup(
-          `<div style="font-family:system-ui;min-width:170px">
-            <strong>${c.name}</strong>
-            <div style="margin:4px 0">${c.live ? "🟢 Live" : "Est."} · ${c.time} · $${c.price}</div>
-            ${dist}
-            <a href="${c.bookingUrl}" target="_blank" rel="noopener noreferrer" style="color:#2b7a2b;font-weight:600">Open booking →</a>
-          </div>`,
-        );
+        const popup = document.createElement("div");
+        popup.style.cssText = "font-family:system-ui;min-width:170px;color:#123526";
+        const name = document.createElement("strong");
+        name.textContent = c.name;
+        const detail = document.createElement("p");
+        detail.textContent = `${c.live ? "Live" : "Estimate"} · ${c.time} · $${c.price} CAD`;
+        popup.append(name, detail);
+        if (c.distanceKm != null) {
+          const distance = document.createElement("p");
+          distance.textContent = `${c.distanceKm} km · ~${c.driveMin} min drive from you`;
+          popup.append(distance);
+        }
+        const bookingUrl = safeBookingUrl(c.bookingUrl);
+        if (bookingUrl) {
+          const link = document.createElement("a");
+          link.href = bookingUrl;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.style.cssText = "color:#174b36;font-weight:600";
+          link.textContent = "Continue to provider →";
+          popup.append(link);
+        }
+        marker.bindPopup(popup);
         bounds.push([c.lat, c.lng]);
       }
 

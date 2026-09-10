@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -15,12 +15,18 @@ import {
 import type { TeeTimeResult } from "@/lib/types";
 import type { Profile } from "@/lib/useProfile";
 import { formatPrice, formatTime12 } from "@/lib/format";
+import {
+  getBookingProvider,
+  safeBookingUrl,
+} from "@/lib/providers/config";
 
 // Booking is intentionally a clean hand-off, not an auto-booking: one tap takes
-// the golfer to the course's own booking page, deep-linked to their date and
-// round length, where they log in and confirm. Email is optional.
+// the golfer to the provider page, where they verify the details, sign in, and
+// confirm. Email is optional.
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const C = {
   surface: "#0f2117",
@@ -57,21 +63,71 @@ export function BookingModal({
   const [emailState, setEmailState] = useState<"idle" | "sending" | "sent">(
     "idle",
   );
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!tee) return;
+    // Reset per-result controls whenever a different tee time opens.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpened(false);
     setShowEmail(false);
     setEmail(profile?.email ?? "");
     setEmailError("");
     setEmailState("idle");
-  }, [tee, profile]);
+    // Saving the contact during delivery must not reset this open dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tee]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    if (tee) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [tee, onClose]);
+    if (!tee) return;
+
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusFrame = window.requestAnimationFrame(() =>
+      closeButtonRef.current?.focus(),
+    );
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE),
+      ).filter((element) => element.offsetParent !== null);
+      if (focusable.length === 0) {
+        e.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [tee]);
 
   async function emailMe() {
     if (!tee) return;
@@ -81,7 +137,7 @@ export function BookingModal({
     setEmailState("sending");
     onSaveProfile({ email: email.trim(), name: profile?.name, phone: profile?.phone });
     try {
-      await fetch("/api/book", {
+      const response = await fetch("/api/book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -97,14 +153,32 @@ export function BookingModal({
           source: tee.source,
         }),
       });
+      const result = (await response.json().catch(() => null)) as {
+        delivered?: boolean;
+        error?: string;
+        note?: string;
+      } | null;
+      if (!response.ok || !result?.delivered) {
+        throw new Error(
+          result?.note ?? result?.error ?? "The email could not be delivered.",
+        );
+      }
       setEmailState("sent");
-    } catch {
+    } catch (error) {
       setEmailState("idle");
-      setEmailError("Couldn't send — try again.");
+      setEmailError(
+        error instanceof Error
+          ? error.message
+          : "Couldn't send the details — try again.",
+      );
     }
   }
 
   const time = tee ? formatTime12(tee.time) : "";
+  const provider = tee ? getBookingProvider(tee.bookingUrl) : null;
+  const handoffUrl = tee ? safeBookingUrl(tee.bookingUrl) : null;
+  const providerName =
+    provider?.id === "course" ? tee?.course.name : provider?.name;
 
   return (
     <AnimatePresence>
@@ -118,6 +192,12 @@ export function BookingModal({
           onClick={(e) => e.target === e.currentTarget && onClose()}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="booking-modal-title"
+            aria-describedby="booking-modal-description"
+            tabIndex={-1}
             initial={{ scale: 0.96, opacity: 0, y: 24 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 16 }}
@@ -125,9 +205,14 @@ export function BookingModal({
             className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border shadow-2xl sm:rounded-3xl"
             style={{ backgroundColor: C.surface, borderColor: C.line }}
           >
+            <p id="booking-modal-description" className="sr-only">
+              Review this tee time and continue to the provider to complete the
+              reservation.
+            </p>
             <button
+              ref={closeButtonRef}
               onClick={onClose}
-              aria-label="Close"
+              aria-label="Close booking details"
               className="absolute right-5 top-5 z-10 rounded-full p-2 transition-colors hover:bg-white/10"
               style={{ color: C.fog }}
             >
@@ -153,7 +238,7 @@ export function BookingModal({
                   {tee.source === "live" ? "Live" : "Est."}
                 </span>
               </div>
-              <h2 className="mt-3 font-display text-2xl font-bold" style={{ color: C.cream }}>
+              <h2 id="booking-modal-title" className="mt-3 font-display text-2xl font-bold" style={{ color: C.cream }}>
                 {tee.course.name}
               </h2>
 
@@ -173,42 +258,54 @@ export function BookingModal({
               {/* ── Redirect-first booking ─────────────────────────── */}
               {!opened ? (
                 <>
-                  <p className="mt-5 text-sm" style={{ color: C.fog }}>
-                    We&apos;ll open {tee.course.name}&apos;s booking page, already set to{" "}
-                    <span style={{ color: C.cream }}>{formatLongDate(tee.date)}</span> and{" "}
-                    <span style={{ color: C.cream }}>{tee.holes} holes</span>. Pick the{" "}
-                    <span style={{ color: C.lime }}>{time}</span> slot, log in, and confirm.
+                  <p className="mt-5 text-sm leading-6" style={{ color: C.fog }}>
+                    {tee.source === "live"
+                      ? `This tee time was available when Fairway last checked. `
+                      : `This is a generated planning estimate, not confirmed availability. Check actual times and prices with the provider. `}
+                    {provider?.contextualHandoff
+                      ? `Your date and round length are included in the booking link. `
+                      : `Check the date, time, player count, and price on the next page. `}
+                    Sign in and confirm with {providerName}; your spot is not reserved yet.
                   </p>
-                  <a
-                    href={tee.bookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setOpened(true)}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-display text-lg font-bold transition hover:brightness-105"
-                    style={{ backgroundColor: C.lime, color: C.base }}
-                  >
-                    Confirm at {tee.course.name.split(" ").slice(0, 3).join(" ")}
-                    <ExternalLink size={20} />
-                  </a>
+                  {handoffUrl ? (
+                    <a
+                      href={handoffUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setOpened(true)}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-display text-lg font-bold transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
+                      style={{ backgroundColor: C.lime, color: C.base }}
+                    >
+                      Continue on {providerName}
+                      <ExternalLink aria-hidden="true" size={20} />
+                    </a>
+                  ) : (
+                    <p className="mt-4 rounded-xl border p-4 text-sm" style={{ borderColor: C.line, color: C.fog }}>
+                      This course does not have a valid booking link yet.
+                    </p>
+                  )}
                 </>
               ) : (
                 <div className="mt-5">
                   <div className="mb-3 flex items-center gap-2 font-semibold" style={{ color: C.lime }}>
-                    <Check size={20} /> Booking page opened
+                    <Check aria-hidden="true" size={20} /> {providerName} opened
                   </div>
                   <ol className="space-y-2 text-sm" style={{ color: C.fog }}>
-                    <li>1. Pick the <span style={{ color: C.lime }}>{time}</span> tee time</li>
-                    <li>2. Log in (or create an account)</li>
-                    <li>3. Confirm — the course emails your real confirmation</li>
+                    <li>1. Check <span style={{ color: C.lime }}>{formatLongDate(tee.date)} at {time}</span></li>
+                    <li>2. Sign in or create your provider account</li>
+                    <li>3. Review the total and confirm on the provider page</li>
                   </ol>
+                  <p className="mt-3 text-xs leading-5" style={{ color: C.fog }}>
+                    No reservation has been made in Fairway. The provider&apos;s confirmation is your proof of booking.
+                  </p>
                   <a
-                    href={tee.bookingUrl}
+                    href={handoffUrl ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border py-3 font-semibold transition hover:bg-white/5"
                     style={{ color: C.cream, borderColor: C.line }}
                   >
-                    Reopen booking page <ExternalLink size={16} />
+                    Reopen {providerName} <ExternalLink aria-hidden="true" size={16} />
                   </a>
                 </div>
               )}
@@ -230,6 +327,9 @@ export function BookingModal({
                 ) : (
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <input
+                      aria-label="Email address"
+                      aria-invalid={Boolean(emailError)}
+                      aria-describedby={emailError ? "booking-email-error" : undefined}
                       type="email"
                       value={email}
                       onChange={(e) => {
@@ -251,7 +351,7 @@ export function BookingModal({
                   </div>
                 )}
                 {emailError && (
-                  <p className="mt-1 text-sm" style={{ color: "#fca5a5" }}>{emailError}</p>
+                  <p id="booking-email-error" role="alert" className="mt-1 text-sm" style={{ color: "#fca5a5" }}>{emailError}</p>
                 )}
               </div>
             </div>

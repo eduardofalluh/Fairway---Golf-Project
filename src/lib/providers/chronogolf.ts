@@ -43,6 +43,7 @@ interface SearchCourse {
   holes?: number[];
   city?: string;
   province?: string;
+  country?: string;
   weekday_price?: number | null;
   weekend_price?: number | null;
   location?: { lat: number; lon: number };
@@ -92,6 +93,9 @@ function bookingUrl(slug: string) {
 
 function toCourse(c: SearchCourse): GolfCourse | null {
   if (!c.uuid || !c.location) return null;
+  // The radius crosses the US border; advertised fees here are CAD only.
+  if (c.country !== "Canada") return null;
+  if (/\b(demo|test|sandbox)\b|lightspeed pas/i.test(c.name)) return null;
   const { lat, lon } = c.location;
   const city = c.city ?? "";
   const holes = (c.holes && c.holes.length ? [...new Set(c.holes)] : [18]).filter(
@@ -256,7 +260,9 @@ export function parseTeetimesResponse(
     if (!parsed) continue;
     const price = t.default_price?.green_fee ?? t.default_price?.subtotal;
     // Skip slots with no real public price ($0 = members/affiliation-only rate).
-    if (typeof price !== "number" || price <= 0) continue;
+    if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) continue;
+    if (t.date && t.date !== date) continue;
+    if (!Number.isInteger(t.max_player_size) || (t.max_player_size ?? 0) < 1) continue;
     // Round length the price is bookable for (9/18) — NOT the course's total.
     const holes = t.default_price?.bookable_holes ?? t.course?.holes ?? 18;
     out.push({
@@ -266,8 +272,8 @@ export function parseTeetimesResponse(
       date,
       time: parsed.time,
       minutes: parsed.minutes,
-      price: Math.round(price),
-      players: t.max_player_size ?? 4,
+      price: Math.round(price * 100) / 100,
+      players: Math.min(t.max_player_size!, 4),
       holes,
       cart: Boolean(t.has_cart),
       source: "live",

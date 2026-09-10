@@ -48,6 +48,7 @@ type SearchValues = {
   maxPrice: number;
   regions: Region[];
   publicOnly: boolean;
+  liveOnly: boolean;
   sort: SortKey;
 };
 
@@ -59,8 +60,22 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "distance", label: "Nearest to me" },
 ];
 
+function defaultSearchDate() {
+  const today = todayISO();
+  const montrealHour = Number(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Toronto",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date()),
+  );
+  if (montrealHour < 14) return today;
+  const [year, month, day] = today.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
+
 export function TeeFinder() {
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(defaultSearchDate);
   const [time, setTime] = useState("13:00");
   const [windowMinutes, setWindowMinutes] = useState(60);
   const [players, setPlayers] = useState(2);
@@ -70,20 +85,18 @@ export function TeeFinder() {
   const [maxPrice, setMaxPrice] = useState(140);
   const [regions, setRegions] = useState<Region[]>([]);
   const [publicOnly, setPublicOnly] = useState(false);
-  const [sort, setSort] = useState<SortKey>("price-desc");
+  const [liveOnly, setLiveOnly] = useState(true);
+  const [sort, setSort] = useState<SortKey>("price-asc");
 
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const [appliedPlayers, setAppliedPlayers] = useState(players);
 
   const { profile, save, clear } = useProfile();
   const [bookingTee, setBookingTee] = useState<TeeTimeResult | null>(null);
-
-  // AI natural-language search
-  const [aiText, setAiText] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
 
   // Location + view
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -113,6 +126,9 @@ export function TeeFinder() {
 
   const runSearch = useCallback(
     async (scroll = false, ov?: Partial<SearchValues>) => {
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
       setLoading(true);
       setError(null);
       const v = {
@@ -126,6 +142,7 @@ export function TeeFinder() {
         maxPrice: ov?.maxPrice ?? maxPrice,
         regions: ov?.regions ?? regions,
         publicOnly: ov?.publicOnly ?? publicOnly,
+        liveOnly: ov?.liveOnly ?? liveOnly,
         sort: ov?.sort ?? sort,
       };
       const params = new URLSearchParams({
@@ -136,76 +153,47 @@ export function TeeFinder() {
         holes: v.holes,
         max: String(v.maxPrice),
         sort: v.sort,
+        live: v.liveOnly ? "1" : "0",
       });
       if (v.useTarget) params.set("target", String(v.targetPrice));
       if (v.regions.length) params.set("regions", v.regions.join(","));
       if (v.publicOnly) params.set("public", "1");
 
       try {
-        const res = await fetch(`/api/tee-times?${params.toString()}`);
+        const res = await fetch(`/api/tee-times?${params.toString()}`, { signal: controller.signal });
         if (!res.ok) throw new Error((await res.json()).error ?? "Search failed");
         const json: SearchResponse = await res.json();
+        if (requestRef.current !== controller) return;
         setData(json);
+        setAppliedPlayers(v.players);
         if (scroll) {
           requestAnimationFrame(() =>
             resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
           );
         }
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Something went wrong");
       } finally {
-        setLoading(false);
+        if (requestRef.current === controller) setLoading(false);
       }
     },
-    [date, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, sort],
+    [date, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, liveOnly, sort],
   );
 
   // initial load so the page is never empty
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     runSearch(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // re-sort instantly when sort changes (cheap, just refetch)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (data) runSearch(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort]);
-
-  const runAiSearch = useCallback(async () => {
-    const q = aiText.trim();
-    if (!q) return;
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      const res = await fetch("/api/parse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q, today: todayISO() }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "AI search failed");
-      const v = json.query as SearchValues;
-      // Reflect the parsed query in the form controls…
-      setDate(v.date);
-      setTime(v.time);
-      setWindowMinutes(v.windowMinutes);
-      setPlayers(v.players);
-      setHoles(v.holes);
-      setUseTarget(v.useTarget);
-      setTargetPrice(v.targetPrice);
-      setMaxPrice(v.maxPrice);
-      setRegions(v.regions);
-      setPublicOnly(v.publicOnly);
-      setSort(v.sort);
-      // …and run the search immediately with those values.
-      runSearch(true, v);
-    } catch (e) {
-      setAiError(e instanceof Error ? e.message : "AI search failed");
-    } finally {
-      setAiLoading(false);
-    }
-  }, [aiText, runSearch]);
 
   const toggleRegion = (r: Region) =>
     setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
@@ -274,57 +262,27 @@ export function TeeFinder() {
   }, [mapCourses, userLoc]);
 
   return (
-    <section id="search" className="relative mx-auto max-w-[1600px] px-5 lg:px-10 py-20 sm:py-28">
-      <div className="mb-10 text-center">
-        <p className="mb-3 text-sm font-medium uppercase tracking-[0.25em] text-lime">
-          The search
-        </p>
-        <h2 className="font-display text-4xl font-bold sm:text-5xl">
-          Name your time. Name your price.
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-fog">
-          We check every course in the region, then line up the slots that fit your
-          window and budget.
-        </p>
-      </div>
-
-      {/* ── AI natural-language search ─────────────────────────────── */}
-      <div className="mb-6">
-        <div className="flex flex-col gap-3 rounded-3xl border border-lime/30 bg-gradient-to-br from-lime/[0.07] to-transparent p-4 sm:flex-row sm:items-center sm:p-5">
-          <div className="flex items-center gap-2 sm:flex-1">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-lime/15 text-lg">
-              ✨
-            </span>
-            <input
-              type="text"
-              value={aiText}
-              onChange={(e) => setAiText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") runAiSearch();
-              }}
-              placeholder="Ask in plain English — e.g. “cheap twilight 9 for 3 near Laval this weekend under $50”"
-              className="h-11 w-full rounded-xl border border-line bg-base-2 px-4 text-cream outline-none placeholder:text-fog/60 focus:border-lime"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={runAiSearch}
-            disabled={aiLoading || !aiText.trim()}
-            className="h-11 shrink-0 rounded-xl bg-lime px-6 font-display font-bold text-[#08160d] transition hover:brightness-105 disabled:opacity-50"
-          >
-            {aiLoading ? "Thinking…" : "Ask AI"}
-          </button>
+    <section id="search" className="relative mx-auto max-w-[1440px] scroll-mt-20 px-5 py-16 sm:px-8 lg:px-10 lg:py-20">
+      <div className="mb-9 grid gap-5 lg:grid-cols-[.7fr_1.3fr] lg:items-end">
+        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Search Greater Montréal</p>
+        <div>
+          <h2 className="font-display text-5xl font-semibold leading-[.9] tracking-[-.035em] sm:text-6xl">Your time. Your price.<br />Every fairway.</h2>
+          <p className="mt-4 max-w-xl text-sm leading-6 text-fog">Start with verified live availability, then compare the rounds that fit your day and budget.</p>
         </div>
-        {aiError && (
-          <p className="mt-2 text-sm text-red-300">{aiError}</p>
-        )}
-        <p className="mt-2 text-center text-xs text-fog sm:text-left">
-          AI fills the filters below and searches — tweak anything by hand after.
-        </p>
       </div>
 
       {/* ── Search panel ───────────────────────────────────────────── */}
-      <div className="rounded-3xl border border-line bg-surface/70 p-6 backdrop-blur-xl sm:p-8 shadow-2xl shadow-black/40">
+      <div className="rounded-[2rem] border border-line bg-surface p-5 shadow-[0_24px_80px_rgba(34,55,44,.08)] sm:p-8 lg:p-10">
+        <div className="mb-8 flex flex-col gap-3 rounded-2xl bg-base px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-cream">Availability quality</p>
+            <p className="mt-0.5 text-xs text-fog">Live results are provider-confirmed. Estimates are always labeled.</p>
+          </div>
+          <button type="button" onClick={() => setLiveOnly((value) => !value)} aria-pressed={liveOnly} className={`inline-flex items-center justify-between gap-3 rounded-full border px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] transition ${liveOnly ? "border-forest bg-forest text-white" : "border-line bg-surface text-fog hover:border-forest"}`}>
+            <span className={`h-2 w-2 rounded-full ${liveOnly ? "bg-lime" : "bg-fog/40"}`} />
+            {liveOnly ? "Live only" : "Live + estimates"}
+          </button>
+        </div>
         <div className="grid gap-6 md:grid-cols-3">
           <Field label="Date">
             <input
@@ -354,7 +312,7 @@ export function TeeFinder() {
                   onClick={() => setPlayers(p)}
                   className={`h-11 flex-1 rounded-xl border text-sm font-semibold transition ${
                     players === p
-                      ? "border-lime bg-lime text-[#08160d]"
+                      ? "border-forest bg-forest text-white"
                       : "border-line bg-base-2 text-fog hover:border-lime-soft"
                   }`}
                 >
@@ -371,7 +329,7 @@ export function TeeFinder() {
             <div className="mb-2 flex items-baseline justify-between">
               <label className="text-sm font-medium text-cream">
                 Flexible by{" "}
-                <span className="text-lime">±{minutesToLabel(windowMinutes)}</span>
+                <span className="text-forest">±{minutesToLabel(windowMinutes)}</span>
               </label>
               <span className="text-xs text-fog">
                 {formatTime12(toHHMM(Math.max(0, parseInt(time.split(":")[0]) * 60 + parseInt(time.split(":")[1]) - windowMinutes)))}{" "}
@@ -400,7 +358,7 @@ export function TeeFinder() {
                   onClick={() => setHoles(h)}
                   className={`h-11 flex-1 rounded-xl border text-sm font-semibold capitalize transition ${
                     holes === h
-                      ? "border-lime bg-lime text-[#08160d]"
+                      ? "border-forest bg-forest text-white"
                       : "border-line bg-base-2 text-fog hover:border-lime-soft"
                   }`}
                 >
@@ -424,7 +382,7 @@ export function TeeFinder() {
                 />
                 Target budget
               </label>
-              <span className="font-display text-lg font-bold text-lime">
+              <span className="font-display text-lg font-bold text-forest">
                 {formatPrice(targetPrice)}
               </span>
             </div>
@@ -469,13 +427,13 @@ export function TeeFinder() {
               aria-pressed={publicOnly}
               className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                 publicOnly
-                  ? "border-lime bg-lime/15 text-lime"
+                  ? "border-forest bg-forest text-white"
                   : "border-line bg-base-2 text-fog hover:border-lime-soft hover:text-cream"
               }`}
             >
               <span
                 className={`grid h-4 w-4 place-items-center rounded-full text-[9px] ${
-                  publicOnly ? "bg-lime text-[#08160d]" : "border border-line"
+                  publicOnly ? "bg-lime text-forest" : "border border-line"
                 }`}
               >
                 {publicOnly ? "✓" : ""}
@@ -500,7 +458,7 @@ export function TeeFinder() {
             type="button"
             onClick={() => runSearch(true)}
             disabled={loading}
-            className="group relative h-14 flex-1 overflow-hidden rounded-2xl bg-lime font-display text-lg font-bold text-[#08160d] transition hover:brightness-105 disabled:opacity-60"
+            className="group relative h-14 flex-1 overflow-hidden rounded-2xl bg-forest text-lg font-bold text-white transition hover:bg-forest-soft disabled:opacity-60"
           >
             <span className="relative z-10">
               {loading ? "Searching the fairways…" : "Find my tee times"}
@@ -527,7 +485,7 @@ export function TeeFinder() {
           <div className={`mt-10 transition-opacity ${loading ? "pointer-events-none opacity-50" : ""}`} aria-busy={loading}>
             {loading && (
               <div className="pointer-events-none sticky top-24 z-20 mb-4 flex justify-center">
-                <span className="inline-flex items-center gap-2 rounded-full border border-lime/40 bg-base-2/90 px-4 py-2 text-sm font-semibold text-lime shadow-lg shadow-black/40 backdrop-blur">
+                <span className="inline-flex items-center gap-2 rounded-full border border-forest/30 bg-surface/95 px-4 py-2 text-sm font-semibold text-forest shadow-lg backdrop-blur">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-lime/30 border-t-lime" />
                   Updating tee times…
                 </span>
@@ -543,7 +501,7 @@ export function TeeFinder() {
                   {data.meta.cheapest != null && (
                     <>
                       From{" "}
-                      <span className="text-lime">{formatPrice(data.meta.cheapest)}</span>{" "}
+                      <span className="font-semibold text-forest">{formatPrice(data.meta.cheapest)}</span>{" "}
                       to {formatPrice(data.meta.priciest ?? 0)} ·{" "}
                     </>
                   )}
@@ -560,7 +518,7 @@ export function TeeFinder() {
                   disabled={geoBusy}
                   className={`inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition disabled:opacity-60 ${
                     userLoc
-                      ? "border-lime bg-lime/15 text-lime"
+                      ? "border-forest bg-forest text-white"
                       : "border-line bg-base-2 text-fog hover:border-lime-soft hover:text-cream"
                   }`}
                   title="Sort and measure by distance from where you are"
@@ -576,7 +534,7 @@ export function TeeFinder() {
                       type="button"
                       onClick={() => setView(v)}
                       className={`h-full rounded-lg px-3 text-sm font-semibold capitalize transition ${
-                        view === v ? "bg-lime text-[#08160d]" : "text-fog hover:text-cream"
+                        view === v ? "bg-forest text-white" : "text-fog hover:text-cream"
                       }`}
                     >
                       {v}
@@ -630,7 +588,7 @@ export function TeeFinder() {
                     {nearest.live ? " · live now" : ""}
                   </span>
                 </span>
-                <span className="shrink-0 text-xs font-semibold text-lime">
+                <span className="shrink-0 text-xs font-semibold text-forest">
                   Sort by nearest →
                 </span>
               </button>
@@ -643,9 +601,13 @@ export function TeeFinder() {
             )}
 
             {data.results.length === 0 && !error && (
-              <div className="rounded-2xl border border-line bg-surface/60 p-10 text-center text-fog">
-                No slots match those filters. Try widening your time window or raising
-                the ceiling.
+              <div className="rounded-2xl border border-line bg-surface p-10 text-center text-fog">
+                <p>No live slots match those filters. Try widening your time window or raising the ceiling.</p>
+                {liveOnly && (
+                  <button type="button" onClick={() => { setLiveOnly(false); runSearch(true, { liveOnly: false }); }} className="mt-5 rounded-full border border-forest px-5 py-2.5 text-xs font-bold uppercase tracking-[.1em] text-forest transition hover:bg-forest hover:text-white">
+                    Include labeled estimates
+                  </button>
+                )}
               </div>
             )}
 
@@ -654,7 +616,7 @@ export function TeeFinder() {
                 <CourseMap courses={mapCourses} user={userLoc} />
                 <p className="mt-3 text-center text-xs text-fog">
                   {mapCourses.length} courses ·{" "}
-                  <span className="text-lime">● live</span> vs{" "}
+                  <span className="font-semibold text-forest">● live</span> vs{" "}
                   <span className="text-fog">● estimated</span>
                   {userLoc ? " · blue dot is you" : " · tap “Use my location” to measure distance"}
                   . Tap a dot for times &amp; booking.
@@ -677,7 +639,7 @@ export function TeeFinder() {
                           target={useTarget ? targetPrice : undefined}
                           r={r}
                           userLoc={userLoc}
-                          onBook={() => setBookingTee(r)}
+                          onBook={() => setBookingTee({ ...r, players: appliedPlayers })}
                         />
                       </motion.li>
                     ))}
@@ -731,10 +693,10 @@ function toHHMM(total: number): string {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="mb-2 block text-sm font-medium text-cream">{label}</label>
+    <fieldset>
+      <legend className="mb-2 block text-sm font-medium text-cream">{label}</legend>
       {children}
-    </div>
+    </fieldset>
   );
 }
 
@@ -753,7 +715,7 @@ function Chip({
       onClick={onClick}
       className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
         active
-          ? "border-lime bg-lime/15 text-lime"
+          ? "border-forest bg-forest text-white"
           : "border-line bg-base-2 text-fog hover:border-lime-soft hover:text-cream"
       }`}
     >
@@ -783,22 +745,18 @@ function ResultCard({
     <div
       className={`group flex flex-col gap-4 rounded-2xl border p-5 transition hover:bg-surface sm:flex-row sm:items-center ${
         isLive
-          ? "border-lime/30 bg-surface/70 hover:border-lime/60"
-          : "border-line bg-surface/40 hover:border-lime-soft/50"
+          ? "border-forest/25 bg-surface hover:border-forest/50"
+          : "border-line bg-surface/70 hover:border-forest/30"
       }`}
     >
       <div className="flex w-full items-center gap-4 sm:w-auto sm:flex-1">
-        <div
-          className={`flex h-14 w-16 flex-col items-center justify-center rounded-xl text-center ${
-            isLive ? "bg-lime/15" : "bg-base-2"
-          }`}
-        >
-          <span className={`font-display text-lg font-bold leading-none ${isLive ? "text-lime" : "text-cream"}`}>
-            {formatTime12(r.time).split(" ")[0]}
-          </span>
-          <span className="text-[10px] uppercase tracking-wider text-fog">
-            {formatTime12(r.time).split(" ")[1]}
-          </span>
+        <div className="relative h-[74px] w-[92px] shrink-0 overflow-hidden rounded-xl bg-base-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={r.course.photo ?? "/hero.jpg"} alt="" loading="lazy" onError={(event) => { event.currentTarget.src = "/hero.jpg"; }} className="h-full w-full object-cover" />
+          <div className="absolute inset-x-0 bottom-0 flex items-baseline justify-center gap-1 bg-forest/85 px-2 py-1.5 text-white backdrop-blur-sm">
+            <span className="font-display text-base font-bold leading-none">{formatTime12(r.time).split(" ")[0]}</span>
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-white/70">{formatTime12(r.time).split(" ")[1]}</span>
+          </div>
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -808,7 +766,7 @@ function ResultCard({
             {isLive ? (
               <span
                 title="Confirmed on the course's live tee sheet right now"
-                className="shrink-0 rounded-full bg-lime/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime"
+                className="shrink-0 rounded-full bg-lime/45 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-forest"
               >
                 ● Live
               </span>
@@ -840,7 +798,7 @@ function ResultCard({
         <div className="text-right">
           <div className="flex items-center justify-end gap-2">
             {near && (
-              <span className="rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+              <span className="rounded-full bg-lime/45 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-forest">
                 On budget
               </span>
             )}
@@ -852,7 +810,7 @@ function ResultCard({
             {isLive ? (
               <>
                 per player ·{" "}
-                <span className="text-lime">
+                <span className="font-semibold text-forest">
                   {r.players} {r.players === 1 ? "spot" : "spots"} open
                 </span>
               </>
@@ -866,8 +824,8 @@ function ResultCard({
           onClick={onBook}
           className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
             isLive
-              ? "bg-lime text-[#08160d] hover:brightness-105"
-              : "border border-lime/40 bg-lime/10 text-lime hover:bg-lime hover:text-[#08160d]"
+              ? "bg-forest text-white hover:bg-forest-soft"
+              : "border border-forest/40 bg-transparent text-forest hover:bg-forest hover:text-white"
           }`}
         >
           {isLive ? "Book" : "Check"}

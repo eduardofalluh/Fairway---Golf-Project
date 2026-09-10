@@ -1,135 +1,80 @@
-# ⛳ Fairway — Montréal tee-time aggregator
+# Fairway — Montréal tee times
 
-One search across every public golf course in the Greater Montréal area. Tell it
-when you want to play, how flexible you are, and what you'll pay — it lines up
-every open slot in the region and sorts it your way.
+A golf comparison app for Montréal and nearby Canadian courses. Search by date,
+time, players, round length, region and budget, compare green fees in CAD, and
+continue to the course's booking provider.
 
-> Chronogolf only shows the courses that pay to be on it. Fairway is built to
-> centralize **all** of them.
+## Current behavior
 
-## Features
+- Cinematic course video with a pause control, reduced-motion support, and a
+  photo fallback; responsive search and course cards.
+- Live Chronogolf availability is the default. Users can explicitly include
+  generated estimates for discovery. Estimates are not available inventory or
+  guaranteed prices, and cannot be booked within Fairway.
+- Official MinuteGolf sign-in and club-specific GGGolf account access open on
+  the provider's site. Fairway does not receive passwords, inspect those browser
+  sessions, or claim the accounts are linked.
+- Selecting a result opens a review panel. The provider confirms availability,
+  the final price and the reservation. Fairway does not make reservations or
+  payments; `/api/autobook` returns HTTP 501.
+- Optional email is a selected-round reminder, never a booking confirmation.
+  The UI only reports delivery if the email service accepts it.
 
-- **Time-window search** — pick a target time + a flexibility of up to ±3 hours
-  (e.g. "1:00 PM ±1 hr" → scans 12:00–2:00 PM).
-- **Price control** — set a target budget *and* a hard ceiling.
-- **Sorting** — price high→low (default), low→high, closest-to-budget,
-  closest-to-time, or nearest-to-you.
-- **Filters** — players (1–4), 9/18 holes, region, all on one screen.
-- **24 real courses** across Montréal Island, Laval, North Shore, South Shore,
-  and off-island east/west.
-- **Sleek animated UI** — Lenis smooth scroll, Framer Motion entrance &
-  scroll-reveal animations, animated hero with parallax.
+See [PROVIDER_INTEGRATIONS.md](./PROVIDER_INTEGRATIONS.md) for verified provider
+links and the access needed to implement account linking and direct booking.
 
-## Stack
-
-- **Next.js 16** (App Router) + TypeScript
-- **Tailwind CSS v4** (theme-driven design tokens)
-- **Framer Motion** (animations / scroll parallax) + **Lenis** (smooth scroll)
-
-## Run it
+## Development and validation
 
 ```bash
-npm install
-npm run dev      # http://localhost:3000
-npm run build && npm start   # production
+npm ci
+npm run dev           # original Next.js development server
+npm run dev:sites     # Cloudflare-compatible local development, port 5173
+npm test              # search validation, availability, prices, booking safety
+npm run lint
+npm run build         # Sites/Cloudflare Worker build through vinext
+npm start             # production preview
 ```
 
-## How the data layer works
-
-```
-src/lib/
-  types.ts                # domain types
-  geo.ts                  # haversine distance + region classifier
-  courses.ts              # curated NON-Chronogolf courses (extras)
-  aggregator.ts           # directory + merge live/estimate + filter + sort
-  format.ts               # display helpers
-  providers/
-    chronogolf.ts         # LIVE Chronogolf directory + tee times
-    seed.ts               # estimated tee times (fallback), priced off real fees
-src/app/api/tee-times/route.ts   # GET search endpoint
-```
-
-The course **directory is fully live**: it's pulled from Chronogolf's public
-marketplace search and refreshed every 6h. Curated non-Chronogolf courses
-(`courses.ts`) are merged in so the app covers courses Chronogolf doesn't list.
-
-For each course on a given date, the aggregator fetches **real live
-availability** from Chronogolf and uses it when the tee sheet is open; otherwise
-it falls back to **estimated** times (clearly labelled `Est.` in the UI),
-priced off that course's real Chronogolf green fee. Every row links to the real
-booking page.
-
-### The Chronogolf integration (real, no API key)
-
-Chronogolf has **no public self-serve developer API** — their Partner API (V2)
-requires a signed B2B agreement with Lightspeed. So we read the same public
-JSON endpoints their own booking widget calls (discovered by inspecting the
-widget's network traffic):
-
-| Purpose | Endpoint |
-| --- | --- |
-| Course directory | `GET /marketplace/v2/search?location[lat]=..&location[lon]=..&location[distance]=..&published=true&page=N` |
-| Tee times | `GET /marketplace/v2/teetimes?start_date=YYYY-MM-DD&course_ids=<uuid>&holes=<n>&start_time=HH:MM&page=N` |
-
-Base host: `https://www.chronogolf.com`. Courses are identified by **UUID**.
-The teetimes response is `{ status: "open" | "closed", teetimes: [...] }` — a
-course's sheet is only `"open"` inside its booking window (often closed
-overnight), in which case we show estimates.
-
-**This is unofficial.** Endpoints can change without notice, may be
-rate-limited or anti-bot'd, and using them may run against Chronogolf's terms.
-All calls fail soft (7s timeout, cached, graceful fallback) so a Chronogolf
-outage never breaks search. For production at scale, pursue the official
-[Partner API](https://partner-api.docs.chronogolf.com/).
-
-Env knobs:
+The original Next.js architecture and routes remain available:
 
 ```bash
-CHRONOGOLF_OFF=1            # disable all live calls (offline dev)
-CHRONOGOLF_RADIUS_KM=75     # directory search radius around downtown
+npm run build:next
+npm run start:next
 ```
 
-Adapters for other platforms (TeeOn, ForeUp) can be added the same way under
-`providers/` and merged in `aggregator.ts`.
+Sites hosting uses `.openai/hosting.json`, `vite.config.mts`, and the build output
+in `dist/`. Local `.env*` files are ignored and are never published as source.
+Configure production secrets in the hosting environment.
 
-## Booking & email confirmations
+## Data and configuration
 
-Clicking **Book** on any result opens a confirmation modal (designed via
-21st.dev's Magic MCP) summarising the tee time. The golfer enters their **email
-(required)** plus **name & phone (optional)** — saved to `localStorage` so it's
-asked only once — and confirms. That POSTs to `/api/book`, which emails a
-confirmation with the tee-time details and a link to finish on the course's own
-booking page.
+`src/lib/providers/chronogolf.ts` reads public marketplace endpoints (unofficial,
+not a supported partner integration). Calls have timeouts, the directory is
+cached, and failures do not fabricate live availability. Canadian listings only;
+demo/test accounts are excluded. Prices retain cents, unknown capacity is not
+assumed available, and past tee times are excluded in the Montréal time zone.
 
-> Fairway is a search + notify layer — it can't complete a real reservation/
-> payment on the course's behalf (that needs each platform's authenticated
-> booking + payment APIs). The confirmation captures the golfer's pick and hands
-> off to the real booking page.
+Curated courses in `src/lib/courses.ts` include verified official booking portals.
+Where a directory-only Chronogolf listing matches a curated course, the verified
+portal takes precedence. Distance is approximate, measured from downtown.
 
-Email sending uses [Resend](https://resend.com). Without a key the request still
-succeeds and is logged server-side, and the UI says delivery isn't configured —
-so set these to send for real:
+Useful environment settings:
 
-```bash
-RESEND_API_KEY=re_xxx                       # required to actually send
-BOOKING_FROM_EMAIL="Fairway <book@yourdomain.com>"   # a Resend-verified sender
-```
+- `CHRONOGOLF_OFF=1`: disable live calls for offline development.
+- `CHRONOGOLF_RADIUS_KM=100`: directory search radius.
+- `RESEND_API_KEY`, `BOOKING_FROM_EMAIL`: optional email reminder delivery.
 
-The hero background is a cinematic image generated with the **Higgsfield** CLI
-(`public/hero.jpg`).
+The retained natural-language search endpoint is not exposed in the refreshed
+interface because it requires a separately configured AI service. No paid
+provider, email or AI credentials are included in this deployment.
 
-## API
+## Search API
 
-```
-GET /api/tee-times?date=2026-06-25&time=13:00&window=60&players=2
-                   &max=140&target=70&sort=price-desc
-                   &holes=18&regions=Laval,North%20Shore
-```
+`GET /api/tee-times?date=2026-09-12&time=13:00&window=60&players=2&holes=18&max=100&sort=price-asc&live=1`
 
-Returns `{ results: TeeTimeResult[], meta: {...} }`.
+Returns `{ results, meta }`. Set `live=0` to explicitly include estimates.
+Invalid dates, times, player counts, region names, sorting and price ranges
+return HTTP 400 before provider calls.
 
----
-
-*Data is indicative — always confirm price and availability on the course's own
-booking page (every result links straight to it). Not affiliated with
-Chronogolf.*
+All prices and availability must be confirmed by the booking provider. Fairway
+is independent of GGGolf, MinuteGolf and Chronogolf.

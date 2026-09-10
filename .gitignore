@@ -44,4 +44,6 @@ next-env.d.ts
 /public/previews/
 
 # large media (host via CDN / Git LFS for deploy)
-/public/hero.mp4
+/dist/
+/.wrangler/
+/.vinext/

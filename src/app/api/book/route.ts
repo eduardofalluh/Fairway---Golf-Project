@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 interface BookingPayload {
   email?: string;
@@ -68,33 +66,7 @@ function subjectFor(b: BookingPayload) {
   return `Your tee time at ${b.course ?? "the course"} — ${b.date ?? ""} ${b.time ?? ""}`;
 }
 
-/** Primary: SMTP via nodemailer (e.g. Gmail app password). */
-async function sendViaSmtp(to: string, html: string, b: BookingPayload): Promise<SendResult> {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) return { delivered: false, reason: "SMTP not configured" };
-
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  const from = process.env.BOOKING_FROM_EMAIL ?? user;
-  // Gmail app passwords are shown in 4 space-separated groups; the spaces are
-  // cosmetic — strip them so auth doesn't fail with BadCredentials.
-  const cleanPass = pass.replace(/\s+/g, "");
-  try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
-      auth: { user, pass: cleanPass },
-    });
-    await transporter.sendMail({ from, to, subject: subjectFor(b), html });
-    return { delivered: true, via: "smtp" };
-  } catch (e) {
-    return { delivered: false, reason: `SMTP error: ${(e as Error).message.slice(0, 180)}` };
-  }
-}
-
-/** Optional secondary: Resend HTTP API. */
+/** Worker-compatible email delivery through Resend's HTTP API. */
 async function sendViaResend(to: string, html: string, b: BookingPayload): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return { delivered: false, reason: "RESEND_API_KEY not configured" };
@@ -112,12 +84,7 @@ async function sendViaResend(to: string, html: string, b: BookingPayload): Promi
 }
 
 async function deliver(to: string, html: string, b: BookingPayload): Promise<SendResult> {
-  const smtp = await sendViaSmtp(to, html, b);
-  if (smtp.delivered) return smtp;
-  const resend = await sendViaResend(to, html, b);
-  if (resend.delivered) return resend;
-  // surface whichever reason is most informative
-  return { delivered: false, reason: smtp.reason !== "SMTP not configured" ? smtp.reason : resend.reason };
+  return sendViaResend(to, html, b);
 }
 
 export async function POST(request: Request) {
@@ -144,12 +111,22 @@ export async function POST(request: Request) {
     console.log(`[booking] delivered via ${result.via} → ${email}`);
   }
 
+  if (!result.delivered) {
+    return NextResponse.json(
+      {
+        ok: false,
+        delivered: false,
+        note: "We couldn't email these details right now. You can still finish on the provider site.",
+        bookingUrl: body.bookingUrl ?? null,
+      },
+      { status: 503 },
+    );
+  }
+
   return NextResponse.json({
     ok: true,
-    delivered: result.delivered,
-    note: result.delivered
-      ? `We emailed your selected tee time to ${email}. It's not a booking yet — finish on the course site to lock it in.`
-      : `We couldn't email you right now (${result.reason}). You can still finish on the course site below.`,
+    delivered: true,
+    note: `We emailed your selected tee time to ${email}. It's not a booking yet — finish on the provider site to lock it in.`,
     bookingUrl: body.bookingUrl ?? null,
   });
 }

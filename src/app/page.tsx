@@ -2,15 +2,8 @@ import { Nav } from "@/components/Nav";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { Hero, CourseMarquee } from "@/components/Hero";
 import { TeeFinder } from "@/components/TeeFinder";
-import {
-  HowItWorks,
-  Stats,
-  RegionsShowcase,
-  CtaBand,
-  Faq,
-  Footer,
-} from "@/components/Sections";
-import { Features } from "@/components/Features";
+import { ProviderAccounts } from "@/components/ProviderAccounts";
+import { HowItWorks, Faq, Footer } from "@/components/Sections";
 import { getDirectory } from "@/lib/aggregator";
 
 // Revalidate the live Chronogolf directory periodically.
@@ -28,11 +21,8 @@ export default async function Home() {
         <Hero courseCount={courses.length} />
         <CourseMarquee names={names} />
         <TeeFinder />
-        <Stats courses={courses} />
-        <Features />
+        <ProviderAccounts />
         <HowItWorks />
-        <RegionsShowcase courses={courses} />
-        <CtaBand />
         <Faq />
       </main>
       <Footer />

@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Sora, Inter } from "next/font/google";
+import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
 import { SmoothScroll } from "@/components/SmoothScroll";
-import { PageLoader } from "@/components/PageLoader";
 
-const display = Sora({
+const display = Cormorant_Garamond({
   variable: "--font-display-var",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  weight: ["500", "600", "700"],
 });
 
 const body = Inter({
@@ -16,9 +15,9 @@ const body = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Fairway — every Montreal tee time, one search",
+  title: "Fairway — Montréal tee times, one search",
   description:
-    "Search live tee times across every golf course in the Greater Montreal area. Pick a time, set a window, name your price.",
+    "Compare live tee times and prices across golf courses in Greater Montréal, then continue to the booking provider.",
 };
 
 export default function RootLayout({
@@ -27,7 +26,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-full antialiased">
-        <PageLoader />
         <SmoothScroll>{children}</SmoothScroll>
       </body>
     </html>
