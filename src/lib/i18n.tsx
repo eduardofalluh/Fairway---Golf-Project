@@ -75,9 +75,7 @@ type Copy = {
     marketArea: Record<MarketId, string>;
     availabilityTitle: string;
     liveOnlyBody: string;
-    liveEstimateBody: string;
     liveOnly: string;
-    liveEstimates: string;
     date: string;
     preferredTime: string;
     players: string;
@@ -114,10 +112,8 @@ type Copy = {
     liveNow: string;
     sortNearest: string;
     noMatches: () => string;
-    includeEstimates: string;
     mapCaption: (count: number, hasUser: boolean) => string;
     liveLegend: string;
-    estimateLegend: string;
     showingTop: (shown: number, total: number) => string;
     confirmedTitle: string;
     estimatedTitle: string;
@@ -298,10 +294,7 @@ export const copy: Record<Language, Copy> = {
       availabilityTitle: "Availability quality",
       liveOnlyBody:
         "Only provider-confirmed slots are shown. If a provider has not opened its tee sheet or the slot disappeared, Fairway shows no card.",
-      liveEstimateBody:
-        "Only provider-confirmed slots are shown. If a provider has not opened its tee sheet or the slot disappeared, Fairway shows no card.",
       liveOnly: "Live only",
-      liveEstimates: "Live only",
       date: "Date",
       preferredTime: "I want to play around",
       players: "Players",
@@ -347,11 +340,9 @@ export const copy: Record<Language, Copy> = {
       sortNearest: "Sort by nearest →",
       noMatches: () =>
         "No provider-confirmed tee times match those filters. Try another time, region, or budget.",
-      includeEstimates: "Show only provider-confirmed slots",
       mapCaption: (count, hasUser) =>
         `${count} courses · ${hasUser ? "blue dot is you" : "tap “Use my location” to measure distance"}. Tap a dot for times & booking.`,
       liveLegend: "● live",
-      estimateLegend: "",
       showingTop: (_shown, total) => `Showing the top 60 of ${total}. Tighten your filters to narrow it down.`,
       confirmedTitle: "Confirmed on the course's live tee sheet right now",
       estimatedTitle: "Not provider-confirmed",
@@ -556,10 +547,7 @@ export const copy: Record<Language, Copy> = {
       availabilityTitle: "Qualité de la disponibilité",
       liveOnlyBody:
         "Seuls les départs confirmés par les fournisseurs sont affichés. Si la feuille n’est pas ouverte ou si le départ a disparu, Fairway ne montre pas de carte.",
-      liveEstimateBody:
-        "Seuls les départs confirmés par les fournisseurs sont affichés. Si la feuille n’est pas ouverte ou si le départ a disparu, Fairway ne montre pas de carte.",
       liveOnly: "Direct seulement",
-      liveEstimates: "Direct seulement",
       date: "Date",
       preferredTime: "Je veux jouer vers",
       players: "Joueurs",
@@ -605,11 +593,9 @@ export const copy: Record<Language, Copy> = {
       sortNearest: "Trier par proximité →",
       noMatches: () =>
         "Aucun départ confirmé par un fournisseur ne correspond à ces filtres. Essayez une autre heure, région ou budget.",
-      includeEstimates: "Afficher seulement les départs confirmés",
       mapCaption: (count, hasUser) =>
         `${count} parcours · ${hasUser ? "le point bleu, c’est vous" : "touchez « Utiliser ma position » pour mesurer la distance"}. Touchez un point pour voir les heures et réserver.`,
       liveLegend: "● direct",
-      estimateLegend: "",
       showingTop: (_shown, total) => `Affichage des 60 meilleurs sur ${total}. Resserrez les filtres pour réduire la liste.`,
       confirmedTitle: "Confirmé sur la feuille de départ en direct du parcours",
       estimatedTitle: "Non confirmé par le fournisseur",
