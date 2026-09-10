@@ -47,3 +47,10 @@ next-env.d.ts
 /dist/
 /.wrangler/
 /.vinext/
+
+# Local Netlify folder
+.netlify
+
+# local agent helper installs
+.agents/
+skills-lock.json
