@@ -1,6 +1,13 @@
-# GGGolf and MinuteGolf integration status
+# Chronogolf, GGGolf and MinuteGolf integration status
 
 Verified against provider-owned pages on September 10, 2026.
+
+Chronogolf is both a live tee-time source and a provider-hosted account handoff.
+Fairway searches public Chronogolf marketplace endpoints when available, and the
+Chronogolf account card links to the official
+[Chronogolf login page](https://www.chronogolf.com/login?returnUrl=https%3A%2F%2Fwww.chronogolf.com%2F).
+The login destination was checked on September 10, 2026 and returned the
+provider-owned CHRONOGOLF login page.
 
 The GGGolf account selector links directly to the public golfer login forms for
 [Club de Golf La Madeleine](https://secure.gggolf.ca/madeleine/index.php?lang=fr&option=com_ggpublic&req=user),

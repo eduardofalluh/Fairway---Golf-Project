@@ -57,6 +57,14 @@ export const BOOKING_PROVIDERS: Record<
 
 export const PROVIDER_ACCOUNT_LINKS = [
   {
+    id: "chronogolf" as const,
+    name: "Chronogolf",
+    href: "https://www.chronogolf.com/login?returnUrl=https%3A%2F%2Fwww.chronogolf.com%2F",
+    action: "Sign in on Chronogolf",
+    description:
+      "Live tee times come from Chronogolf when its course sheet is open. Sign in there before you finish booking.",
+  },
+  {
     id: "minutegolf" as const,
     name: "MinuteGolf",
     href: "https://www.minutegolf.ca/index.php?option=com_ggportal&req=user&lang=en",
