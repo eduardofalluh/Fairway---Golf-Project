@@ -70,11 +70,15 @@ export const PROVIDER_ACCOUNT_LINKS = [
     href: "https://www.gggolf.ca/aide-aux-golfeurs",
     action: "Sign in on GGGolf",
     description:
-      "Choose your club to open its GGGolf login form. Your password stays with GGGolf.",
+      "Choose a verified local club portal. Your password stays with GGGolf.",
   },
 ] as const;
 
 export const GGGOLF_CLUB_PORTALS = [
+  {
+    name: "Club de Golf La Madeleine",
+    href: "https://secure.gggolf.ca/madeleine/index.php?lang=fr&option=com_ggpublic&req=user",
+  },
   {
     name: "Le Parcours du Cerf",
     href: "https://secure.gggolf.ca/cerf/index.php?option=com_ggpublic&req=user&lang=fr",

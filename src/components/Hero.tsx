@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { ArrowDownRight, Pause, Play } from "lucide-react";
+import { ArrowDownRight, KeyRound, Pause, Play } from "lucide-react";
 
 export function Hero({ courseCount }: { courseCount: number }) {
   const sectionRef = useRef<HTMLElement>(null);
@@ -55,6 +55,10 @@ export function Hero({ courseCount }: { courseCount: number }) {
             <a href="#search" className="button-primary group">
               Explore tee times
               <ArrowDownRight size={17} className="transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
+            </a>
+            <a href="#accounts" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/40 bg-white/10 px-5 py-3 text-xs font-extrabold uppercase tracking-[0.1em] text-white backdrop-blur transition hover:border-lime hover:text-lime focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime">
+              <KeyRound size={16} aria-hidden="true" />
+              Connect accounts
             </a>
             <p className="max-w-sm text-sm leading-relaxed text-white/72 sm:text-base">Compare nearby courses and green fees. Find a time that fits.</p>
           </motion.div>

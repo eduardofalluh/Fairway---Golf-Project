@@ -20,8 +20,8 @@ export default async function Home() {
       <main>
         <Hero courseCount={courses.length} />
         <CourseMarquee names={names} />
-        <TeeFinder />
         <ProviderAccounts />
+        <TeeFinder />
         <HowItWorks />
         <Faq />
       </main>

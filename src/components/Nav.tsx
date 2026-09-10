@@ -23,8 +23,8 @@ export function Nav() {
           Fairway
         </a>
         <div className={`hidden items-center gap-8 text-xs font-semibold uppercase tracking-[0.14em] md:flex ${scrolled ? "text-fog" : "text-white/75"}`}>
-          <a href="#search" className="transition hover:text-lime">Tee times</a>
           <a href="#accounts" className="transition hover:text-lime">Accounts</a>
+          <a href="#search" className="transition hover:text-lime">Tee times</a>
           <a href="#how" className="transition hover:text-lime">How it works</a>
           <a href="#faq" className="transition hover:text-lime">FAQ</a>
         </div>

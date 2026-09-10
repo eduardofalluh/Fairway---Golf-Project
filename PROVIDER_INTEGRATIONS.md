@@ -3,12 +3,17 @@
 Verified against provider-owned pages on September 10, 2026.
 
 The GGGolf account selector links directly to the public golfer login forms for
+[Club de Golf La Madeleine](https://secure.gggolf.ca/madeleine/index.php?lang=fr&option=com_ggpublic&req=user),
 [Le Parcours du Cerf](https://secure.gggolf.ca/cerf/index.php?option=com_ggpublic&req=user&lang=fr),
 [Golf de l'Île de Montréal](https://secure.gggolf.ca/iledemontreal/index.php?option=com_ggpublic&req=user&lang=fr),
 and [Golf Atlantide](https://secure.gggolf.ca/atlantide/index.php?option=com_ggpublic&req=user&lang=fr).
 Each destination was opened in a browser and verified to display email/password
 fields. A club must be selected before sign-in becomes available; golfer help is
 a separate link. These are login destinations, distinct from tee-sheet URLs.
+
+GGGolf is not limited to the four clubs currently shown in Fairway. The Fairway
+selector intentionally lists only local club portals that are currently present
+in the app's course data and verified to open a public golfer login form.
 
 ## What Fairway supports now
 

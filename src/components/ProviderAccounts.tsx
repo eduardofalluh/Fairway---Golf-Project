@@ -19,27 +19,35 @@ export function ProviderAccounts() {
     <section
       id="accounts"
       aria-labelledby="provider-accounts-title"
-      className="bg-[#f3efe4] px-5 py-20 text-[#153528] sm:px-8 sm:py-28"
+      className="scroll-mt-20 border-b border-[#d6cebd] bg-[#f3efe4] px-5 py-14 text-[#153528] sm:px-8 sm:py-18"
     >
       <div className="mx-auto max-w-6xl">
-        <div className="max-w-2xl">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#547164]">
-            Provider accounts
-          </p>
-          <h2
-            id="provider-accounts-title"
-            className="font-display text-4xl font-bold tracking-tight sm:text-5xl"
-          >
-            Sign in where your tee time lives.
-          </h2>
-          <p className="mt-5 text-base leading-7 text-[#547164] sm:text-lg">
-            Open the provider&apos;s own sign-in page, then come back to compare
-            tee times. Fairway never asks for or stores your golf account
-            password.
-          </p>
+        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+          <div className="max-w-2xl">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#547164]">
+              Start here
+            </p>
+            <h2
+              id="provider-accounts-title"
+              className="font-display text-4xl font-bold tracking-tight sm:text-5xl"
+            >
+              Connect your booking accounts first.
+            </h2>
+            <p className="mt-5 text-base leading-7 text-[#547164] sm:text-lg">
+              Open MinuteGolf or your club&apos;s GGGolf sign-in page before you
+              compare tee times. Fairway keeps the search in one place while
+              each provider handles its own secure login.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:justify-self-end">
+            <AccountStat label="MinuteGolf" value="Central login" />
+            <AccountStat label="GGGolf" value={`${GGGOLF_CLUB_PORTALS.length} verified portals`} />
+            <AccountStat label="Security" value="Provider hosted" />
+          </div>
         </div>
 
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
+        <div className="mt-9 grid gap-4 md:grid-cols-2">
           {PROVIDER_ACCOUNT_LINKS.map((provider) => {
             const wasOpened = openedProvider === provider.id;
             const selectedClub = GGGOLF_CLUB_PORTALS.find(
@@ -89,7 +97,7 @@ export function ProviderAccounts() {
                       }}
                       className="min-h-12 w-full rounded-xl border border-[#cbd3c7] bg-[#f3efe4] px-4 text-sm font-semibold text-[#153528] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#153528]"
                     >
-                      <option value="" disabled>Choose your club</option>
+                      <option value="" disabled>Choose your club ({GGGOLF_CLUB_PORTALS.length})</option>
                       {GGGOLF_CLUB_PORTALS.map((club) => (
                         <option key={club.href} value={club.href}>
                           {club.name}
@@ -140,10 +148,22 @@ export function ProviderAccounts() {
         </div>
 
         <p className="mt-7 max-w-3xl text-sm leading-6 text-[#64776d]">
-          In-app account linking and checkout are not available yet. Complete
-          and confirm your reservation with the provider.
+          GGGolf serves many clubs, but Fairway only shows verified local login
+          portals here. In-app account linking and checkout are not available
+          yet, so complete and confirm your reservation with the provider.
         </p>
       </div>
     </section>
+  );
+}
+
+function AccountStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[#cbd3c7] bg-[#fffdf7]/70 p-4 shadow-[0_10px_30px_rgba(21,53,40,0.05)]">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6f8178]">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-bold text-[#153528]">{value}</p>
+    </div>
   );
 }
