@@ -13,6 +13,7 @@ export type MapCourse = {
   live: boolean;
   time: string; // formatted nearest tee time
   price: number;
+  holes: number;
   distanceKm: number | null; // from the user (null if location unknown)
   driveMin: number | null;
   bookingUrl: string;
@@ -73,7 +74,7 @@ export function CourseMap({
         const name = document.createElement("strong");
         name.textContent = c.name;
         const detail = document.createElement("p");
-        detail.textContent = `${c.live ? "Live" : "Estimate"} · ${c.time} · $${c.price} CAD`;
+        detail.textContent = `${c.live ? "Live" : "Estimate"} · ${c.time} · ${c.holes} holes · $${c.price} CAD`;
         popup.append(name, detail);
         if (c.distanceKm != null) {
           const distance = document.createElement("p");

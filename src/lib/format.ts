@@ -1,5 +1,5 @@
 export function formatPrice(n: number): string {
-  return `$${n.toLocaleString("en-CA")}`;
+  return `$${n.toLocaleString("en-CA", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
 
 export function formatTime12(time: string): string {

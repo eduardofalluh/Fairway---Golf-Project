@@ -45,6 +45,10 @@ const ISLAND_CITIES = [
   "senneville",
 ];
 
+const SOUTH_SHORE_CITIES = ["boucherville", "longueuil", "brossard", "saint lambert", "candiac", "kahnawake", "saint basile le grand", "mont saint hilaire", "beloeil", "saint bruno", "sainte julie", "varennes", "vercheres", "la prairie", "saint jean sur richelieu"];
+const NORTH_SHORE_CITIES = ["mirabel", "saint janvier", "terrebonne", "lorraine", "blainville", "rosemere", "boisbriand", "bois des filion", "sainte therese", "saint eustache", "deux montagnes", "saint jerome", "sainte sophie", "mascouche", "repentigny", "l assomption", "lavaltrie"];
+const normalizedCity = (city: string) => city.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\bst\b/g, "saint").replace(/\bste\b/g, "sainte");
+
 /**
  * Best-effort region classifier for the Greater Montréal area. Uses city-name
  * hints first, then falls back to geography relative to downtown. Far-flung
@@ -55,10 +59,12 @@ export function classifyRegion(
   lat: number,
   lng: number,
 ): Region {
-  const c = (city || "").toLowerCase().trim();
+  const c = normalizedCity(city || "");
 
-  if (c.includes("laval")) return "Laval";
-  if (ISLAND_CITIES.some((x) => c.includes(x))) return "Montreal Island";
+  if (c === "laval" || c === "laval sur le lac" || c === "sainte dorothee" || c === "chomedey") return "Laval";
+  if (ISLAND_CITIES.some((x) => c.includes(normalizedCity(x)))) return "Montreal Island";
+  if (SOUTH_SHORE_CITIES.some((x) => c === x || c.startsWith(`${x} `))) return "South Shore";
+  if (NORTH_SHORE_CITIES.some((x) => c === x || c.startsWith(`${x} `))) return "North Shore";
 
   // Geography fallback.
   if (lng < -73.85) return "Off-Island West";

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeBookingUrl } from "@/lib/providers/config";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,7 @@ async function sendViaResend(to: string, html: string, b: BookingPayload): Promi
   if (!key) return { delivered: false, reason: "RESEND_API_KEY not configured" };
   const from = process.env.BOOKING_FROM_EMAIL ?? "Fairway <onboarding@resend.dev>";
   const res = await fetch("https://api.resend.com/emails", {
+    signal: AbortSignal.timeout(10000),
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from, to: [to], subject: subjectFor(b), html }),
@@ -95,21 +97,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body) || typeof body.email !== "string") {
+    return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+  }
+  for (const value of [body.name, body.phone, body.course, body.city, body.date, body.time, body.source]) {
+    if (value != null && typeof value !== "string") return NextResponse.json({ error: "Invalid round details" }, { status: 400 });
+  }
+  if (body.bookingUrl != null && (typeof body.bookingUrl !== "string" || !safeBookingUrl(body.bookingUrl))) {
+    return NextResponse.json({ error: "Invalid booking link" }, { status: 400 });
+  }
   const email = (body.email ?? "").trim();
-  if (!EMAIL_RE.test(email)) {
+  if (email.length > 254 || !EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
   }
 
   const html = confirmationHtml(body);
-  const result = await deliver(email, html, body);
-
-  if (!result.delivered) {
-    console.log(
-      `[booking] (not delivered: ${result.reason}) ${email} → ${body.course} ${body.date} ${body.time} $${body.price}`,
-    );
-  } else {
-    console.log(`[booking] delivered via ${result.via} → ${email}`);
-  }
+  const result = await deliver(email, html, body).catch(() => ({ delivered: false }));
 
   if (!result.delivered) {
     return NextResponse.json(

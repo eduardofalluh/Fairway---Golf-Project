@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import type { Region, TeeTimeResult } from "@/lib/types";
 import type { SearchResponse } from "@/lib/aggregator";
@@ -16,6 +16,7 @@ import { haversineKm } from "@/lib/geo";
 import { useProfile } from "@/lib/useProfile";
 import { BookingModal } from "./BookingModal";
 import type { MapCourse } from "./CourseMap";
+import { selectMapTeeTimes } from "@/lib/map-results";
 
 // Rough driving-time estimate from straight-line distance (metro road factor).
 const driveMinutes = (km: number) => Math.max(1, Math.round(km * 1.2));
@@ -172,8 +173,10 @@ export function TeeFinder() {
           );
         }
       } catch (e) {
+        if (requestRef.current !== controller) return;
         if (e instanceof DOMException && e.name === "AbortError") return;
-        setError(e instanceof Error ? e.message : "Something went wrong");
+        setData(null);
+        setError(e instanceof TypeError ? "We couldn't reach the tee-time service. Please try again." : e instanceof Error ? e.message : "Something went wrong");
       } finally {
         if (requestRef.current === controller) setLoading(false);
       }
@@ -212,43 +215,21 @@ export function TeeFinder() {
     return data.results;
   }, [data, userLoc, sort]);
 
-  // One marker per course for the map: nearest-to-desired-time slot, min price,
-  // live if any of its slots is live.
+  // Keep the marker's time, price, holes and URL attached to the same result.
   const mapCourses = useMemo<MapCourse[]>(() => {
     if (!data) return [];
-    const byId = new Map<string, MapCourse & { delta: number }>();
-    for (const r of data.results) {
+    return selectMapTeeTimes(data.results).filter((r) =>
+      Number.isFinite(r.course.lat) && Number.isFinite(r.course.lng),
+    ).map((r) => {
       const c = r.course;
-      if (typeof c.lat !== "number" || typeof c.lng !== "number") continue;
-      const km = userLoc
-        ? haversineKm(userLoc.lat, userLoc.lng, c.lat, c.lng)
-        : null;
-      const existing = byId.get(c.id);
-      if (!existing) {
-        byId.set(c.id, {
-          id: c.id,
-          name: c.name,
-          lat: c.lat,
-          lng: c.lng,
-          live: r.source === "live",
-          time: formatTime12(r.time),
-          price: r.price,
-          distanceKm: km,
-          driveMin: km != null ? driveMinutes(km) : null,
-          bookingUrl: r.bookingUrl,
-          delta: r.deltaMinutes,
-        });
-      } else {
-        existing.live = existing.live || r.source === "live";
-        existing.price = Math.min(existing.price, r.price);
-        if (r.deltaMinutes < existing.delta) {
-          existing.delta = r.deltaMinutes;
-          existing.time = formatTime12(r.time);
-          existing.bookingUrl = r.bookingUrl;
-        }
-      }
-    }
-    return [...byId.values()];
+      const km = userLoc ? haversineKm(userLoc.lat, userLoc.lng, c.lat, c.lng) : null;
+      return {
+        id: c.id, name: c.name, lat: c.lat, lng: c.lng,
+        live: r.source === "live", time: formatTime12(r.time), price: r.price,
+        holes: r.holes, distanceKm: km,
+        driveMin: km != null ? driveMinutes(km) : null, bookingUrl: r.bookingUrl,
+      };
+    });
   }, [data, userLoc]);
 
   // Closest course to the user (prefer ones with live availability).
@@ -287,6 +268,7 @@ export function TeeFinder() {
           <Field label="Date">
             <input
               type="date"
+              aria-label="Date"
               value={date}
               min={todayISO()}
               onChange={(e) => setDate(e.target.value)}
@@ -297,6 +279,7 @@ export function TeeFinder() {
           <Field label="I want to play around">
             <input
               type="time"
+              aria-label="Preferred tee time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
               className="input"
@@ -309,6 +292,7 @@ export function TeeFinder() {
                 <button
                   key={p}
                   type="button"
+                  aria-pressed={players === p}
                   onClick={() => setPlayers(p)}
                   className={`h-11 flex-1 rounded-xl border text-sm font-semibold transition ${
                     players === p
@@ -339,6 +323,7 @@ export function TeeFinder() {
             </div>
             <input
               type="range"
+              aria-label="Time flexibility in minutes"
               min={0}
               max={180}
               step={15}
@@ -355,6 +340,7 @@ export function TeeFinder() {
                 <button
                   key={h}
                   type="button"
+                  aria-pressed={holes === h}
                   onClick={() => setHoles(h)}
                   className={`h-11 flex-1 rounded-xl border text-sm font-semibold capitalize transition ${
                     holes === h
@@ -390,6 +376,7 @@ export function TeeFinder() {
               type="range"
               min={20}
               max={200}
+              aria-label="Target budget per player"
               step={5}
               value={targetPrice}
               disabled={!useTarget}
@@ -409,6 +396,7 @@ export function TeeFinder() {
               type="range"
               min={20}
               max={250}
+              aria-label="Maximum price per player"
               step={5}
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
@@ -469,6 +457,11 @@ export function TeeFinder() {
 
       {/* ── Results ────────────────────────────────────────────────── */}
       <div ref={resultsRef} className="scroll-mt-24">
+        {error && (
+          <div role="alert" className="mt-6 rounded-2xl border border-red-700/30 bg-red-50 p-4 text-red-800">
+            {error}
+          </div>
+        )}
         {loading && !data && (
           <div className="mt-10 grid gap-3" aria-busy="true">
             <div className="mb-2 h-7 w-64 animate-pulse rounded-lg bg-surface/60" />
@@ -495,7 +488,7 @@ export function TeeFinder() {
               <div>
                 <h3 className="font-display text-2xl font-bold">
                   {data.meta.total} tee {data.meta.total === 1 ? "time" : "times"}
-                  <span className="text-fog"> · {data.meta.courses} courses</span>
+                  <span className="text-fog"> · {data.meta.courses} {data.meta.courses === 1 ? "course" : "courses"}</span>
                 </h3>
                 <p className="mt-1 text-sm text-fog">
                   {data.meta.cheapest != null && (
@@ -505,9 +498,9 @@ export function TeeFinder() {
                       to {formatPrice(data.meta.priciest ?? 0)} ·{" "}
                     </>
                   )}
-                  {data.meta.liveRows > 0
-                    ? `${data.meta.liveRows} live from Chronogolf (${data.meta.liveCourses} courses) · rest estimated`
-                    : `estimated times — no open Chronogolf sheets for this date yet · ${data.meta.directorySize} courses tracked`}
+                  {data.meta.total === 0
+                    ? "No results match this search. Availability can change; check again or adjust your filters."
+                    : `${data.meta.liveRows} live from Chronogolf${data.meta.total > data.meta.liveRows ? ` · ${data.meta.total - data.meta.liveRows} generated estimates` : ""}`}
                 </p>
               </div>
 
@@ -533,6 +526,7 @@ export function TeeFinder() {
                       key={v}
                       type="button"
                       onClick={() => setView(v)}
+                      aria-pressed={view === v}
                       className={`h-full rounded-lg px-3 text-sm font-semibold capitalize transition ${
                         view === v ? "bg-forest text-white" : "text-fog hover:text-cream"
                       }`}
@@ -594,15 +588,9 @@ export function TeeFinder() {
               </button>
             )}
 
-            {error && (
-              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
-                {error}
-              </div>
-            )}
-
             {data.results.length === 0 && !error && (
               <div className="rounded-2xl border border-line bg-surface p-10 text-center text-fog">
-                <p>No live slots match those filters. Try widening your time window or raising the ceiling.</p>
+                <p>No {liveOnly ? "live slots" : "results"} match those filters. Try another time, region, or budget.</p>
                 {liveOnly && (
                   <button type="button" onClick={() => { setLiveOnly(false); runSearch(true, { liveOnly: false }); }} className="mt-5 rounded-full border border-forest px-5 py-2.5 text-xs font-bold uppercase tracking-[.1em] text-forest transition hover:bg-forest hover:text-white">
                     Include labeled estimates
@@ -624,15 +612,13 @@ export function TeeFinder() {
               </>
             ) : (
               <>
-                <motion.ul layout className="grid gap-3">
-                  <AnimatePresence mode="popLayout">
+                <motion.ul layout className="grid grid-cols-1 gap-3">
                     {orderedResults.slice(0, 60).map((r, i) => (
                       <motion.li
                         layout
                         key={r.id}
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.35, delay: Math.min(i * 0.02, 0.4) }}
                       >
                         <ResultCard
@@ -643,7 +629,6 @@ export function TeeFinder() {
                         />
                       </motion.li>
                     ))}
-                  </AnimatePresence>
                 </motion.ul>
 
                 {orderedResults.length > 60 && (
@@ -665,21 +650,7 @@ export function TeeFinder() {
         onSaveProfile={save}
       />
 
-      <style jsx>{`
-        :global(.input) {
-          height: 2.75rem;
-          width: 100%;
-          border-radius: 0.75rem;
-          border: 1px solid var(--color-line);
-          background: var(--color-base-2);
-          padding: 0 0.85rem;
-          color: var(--color-cream);
-          outline: none;
-        }
-        :global(.input:focus) {
-          border-color: var(--color-lime);
-        }
-      `}</style>
+
     </section>
   );
 }
@@ -749,7 +720,7 @@ function ResultCard({
           : "border-line bg-surface/70 hover:border-forest/30"
       }`}
     >
-      <div className="flex w-full items-center gap-4 sm:w-auto sm:flex-1">
+      <div className="flex min-w-0 w-full items-center gap-4 sm:w-auto sm:flex-1">
         <div className="relative h-[74px] w-[92px] shrink-0 overflow-hidden rounded-xl bg-base-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={r.course.photo ?? "/hero.jpg"} alt="" loading="lazy" onError={(event) => { event.currentTarget.src = "/hero.jpg"; }} className="h-full w-full object-cover" />

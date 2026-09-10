@@ -101,15 +101,15 @@ async function gatherTeeTimes(
   date: string,
 ): Promise<TeeTime[]> {
   const perCourse = await mapLimit(courses, concurrency, async (course) => {
-    let live: TeeTime[] = [];
+    let live: TeeTime[] | null = null;
     if (course.online && course.chronogolfUuid) {
       try {
         live = await fetchCourseTeeTimes(course, date);
       } catch {
-        live = [];
+        live = null;
       }
     }
-    if (live.length > 0) return live;
+    if (live !== null) return live;
     return generateEstimatedTeeTimes(course, date);
   });
   return perCourse.flat();
@@ -130,6 +130,7 @@ export function applySearch(
   const currentMinutes = parseTimeToMinutes(localTime);
 
   for (const t of teeTimes) {
+    if (t.date !== query.date) continue;
     if (t.date < today || (t.date === today && t.minutes <= currentMinutes)) continue;
     if (Math.abs(t.minutes - desired) > window) continue;
     if (t.players < query.players) continue;

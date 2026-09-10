@@ -168,7 +168,8 @@ export async function getChronogolfCourses(): Promise<GolfCourse[]> {
 }
 
 function pad(t: string): { time: string; minutes: number } | null {
-  const m = t.match(/(\d{1,2}):(\d{2})/);
+  if (typeof t !== "string") return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})(?::[0-5]\d)?$/);
   if (!m) return null;
   const h = Number(m[1]);
   const min = Number(m[2]);
@@ -202,15 +203,15 @@ async function getCourseUuids(slug: string): Promise<string[]> {
   return uuids;
 }
 
-/** Fetch live tee times for a single course on a date. Best-effort. */
+/** null = unavailable feed; [] = provider confirmed no bookable rows. */
 export async function fetchCourseTeeTimes(
   course: GolfCourse,
   date: string,
-): Promise<TeeTime[]> {
-  if (DISABLED || !course.chronogolfSlug || !course.online) return [];
+): Promise<TeeTime[] | null> {
+  if (DISABLED || !course.chronogolfSlug || !course.online) return null;
 
   const courseUuids = await getCourseUuids(course.chronogolfSlug);
-  if (!courseUuids.length) return [];
+  if (!courseUuids.length) return null;
 
   // Ask for both round lengths the club offers, in one query per page.
   const holes =
@@ -219,12 +220,14 @@ export async function fetchCourseTeeTimes(
 
   const out: TeeTime[] = [];
   const seen = new Set<string>();
+  let receivedSheet = false;
   for (let page = 1; page <= 4; page++) {
     const data = await getJson<TeetimesResponse>(
       `${BASE}/teetimes?start_date=${date}&course_ids=${ids}` +
         `&holes=${holes}&start_time=00:00&page=${page}`,
       120,
     );
+    if (data?.status === "closed" || (data?.status === "open" && Array.isArray(data.teetimes))) receivedSheet = true;
     const rows = parseTeetimesResponse(course, date, data);
     for (const row of rows) {
       const key = `${row.time}-${row.holes}`;
@@ -235,7 +238,7 @@ export async function fetchCourseTeeTimes(
     // Stop once a page comes back short (last page) or empty.
     if (!data?.teetimes || data.teetimes.length < 20) break;
   }
-  return out;
+  return receivedSheet ? out : null;
 }
 
 interface TeetimesResponse {
@@ -265,6 +268,7 @@ export function parseTeetimesResponse(
     if (!Number.isInteger(t.max_player_size) || (t.max_player_size ?? 0) < 1) continue;
     // Round length the price is bookable for (9/18) — NOT the course's total.
     const holes = t.default_price?.bookable_holes ?? t.course?.holes ?? 18;
+    if (holes !== 9 && holes !== 18) continue;
     out.push({
       // Stable + unique per (course, date, round length, tee time).
       id: `${course.id}-${date}-live-${holes}-${parsed.minutes}`,

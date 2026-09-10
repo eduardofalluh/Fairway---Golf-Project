@@ -116,3 +116,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     transition-duration: .01ms !important;
   }
 }
+
+#search .input {
+  height: 2.75rem;
+  width: 100%;
+  min-width: 0;
+  border-radius: .75rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-base-2);
+  padding: 0 .85rem;
+  color: var(--color-cream);
+}
+#search .input:focus { border-color: var(--color-forest); }
+#search fieldset { min-width: 0; }
