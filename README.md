@@ -8,9 +8,10 @@ continue to the course's booking provider.
 
 - Cinematic course video with a pause control, reduced-motion support, and a
   photo fallback; responsive search and course cards.
-- Live Chronogolf availability is the default. Users can explicitly include
-  generated estimates for discovery. Estimates are not available inventory or
-  guaranteed prices, and cannot be booked within Fairway.
+- The search UI starts with live Chronogolf availability plus clearly labeled
+  generated estimates so users see useful options right away. Users can switch
+  to live-only for provider-confirmed inventory. Estimates are not available
+  inventory or guaranteed prices, and cannot be booked within Fairway.
 - Official Chronogolf, MinuteGolf, and club-specific GGGolf account access open
   on the provider's site. Fairway does not receive passwords, inspect those
   browser sessions, or claim the accounts are linked. Users can mark a provider

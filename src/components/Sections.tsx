@@ -50,7 +50,7 @@ export function CtaBand() {
 }
 
 const FAQS = [
-  { q: "Are all results live?", a: "Live availability is the default. You can choose to include clearly marked estimates when a provider has not opened or exposed its tee sheet for that date." },
+  { q: "Are all results live?", a: "The search starts with live slots plus clearly marked estimates so you can compare options right away. Use the live-only filter when you want provider-confirmed inventory only." },
   { q: "Where does availability come from?", a: "Chronogolf availability can appear live when its tee sheet is reachable. Other listed provider and course options are shown as clearly marked estimates until you verify them on the booking page." },
   { q: "How does the time window work?", a: "Choose your ideal tee time and up to three hours of flexibility in either direction. Fairway returns matching slots and lets you sort the list your way." },
   { q: "Does Fairway complete the payment?", a: "You review the final details, sign in on the provider page, and complete payment there. The provider sends the booking confirmation." },

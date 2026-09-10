@@ -88,7 +88,7 @@ export function TeeFinder() {
   const [maxPrice, setMaxPrice] = useState(140);
   const [regions, setRegions] = useState<Region[]>([]);
   const [publicOnly, setPublicOnly] = useState(false);
-  const [liveOnly, setLiveOnly] = useState(true);
+  const [liveOnly, setLiveOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("price-asc");
 
   const [data, setData] = useState<SearchResponse | null>(null);
@@ -251,7 +251,7 @@ export function TeeFinder() {
         <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Search Greater Montréal</p>
         <div>
           <h2 className="font-display text-5xl font-semibold leading-[.9] tracking-[-.035em] sm:text-6xl">Your time. Your price.<br />Every fairway.</h2>
-          <p className="mt-4 max-w-xl text-sm leading-6 text-fog">Start with verified live availability, then compare the rounds that fit your day and budget.</p>
+          <p className="mt-4 max-w-xl text-sm leading-6 text-fog">Compare every useful option first. Provider-confirmed slots appear live, and estimates stay clearly labeled.</p>
         </div>
       </div>
 
@@ -260,10 +260,14 @@ export function TeeFinder() {
         <div className="mb-8 flex flex-col gap-3 rounded-2xl bg-base px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-cream">Availability quality</p>
-            <p className="mt-0.5 text-xs text-fog">Live results are provider-confirmed. Estimates are always labeled.</p>
+            <p className="mt-0.5 text-xs text-fog">
+              {liveOnly
+                ? "Only provider-confirmed slots are shown. Include estimates when providers have not opened their sheets yet."
+                : "Showing live slots plus labeled estimates. Switch to live-only when you want provider-confirmed inventory only."}
+            </p>
           </div>
-          <button type="button" onClick={() => setLiveOnly((value) => !value)} aria-pressed={liveOnly} className={`inline-flex items-center justify-between gap-3 rounded-full border px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] transition ${liveOnly ? "border-forest bg-forest text-white" : "border-line bg-surface text-fog hover:border-forest"}`}>
-            <span className={`h-2 w-2 rounded-full ${liveOnly ? "bg-lime" : "bg-fog/40"}`} />
+          <button type="button" onClick={() => setLiveOnly((value) => !value)} aria-pressed={!liveOnly} className={`inline-flex items-center justify-between gap-3 rounded-full border px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] transition ${!liveOnly ? "border-forest bg-forest text-white" : "border-line bg-surface text-fog hover:border-forest"}`}>
+            <span className={`h-2 w-2 rounded-full ${!liveOnly ? "bg-lime" : "bg-fog/40"}`} />
             {liveOnly ? "Live only" : "Live + estimates"}
           </button>
         </div>
@@ -496,7 +500,7 @@ export function TeeFinder() {
                 <p className="mt-1 text-sm text-fog">
                   {data.meta.cheapest != null && (
                     <>
-                      From{" "}
+                      {data.meta.liveRows === 0 ? "Estimated from" : "From"}{" "}
                       <span className="font-semibold text-forest">{formatPrice(data.meta.cheapest)}</span>{" "}
                       to {formatPrice(data.meta.priciest ?? 0)} ·{" "}
                     </>
