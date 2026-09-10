@@ -71,13 +71,18 @@ interface ClubDetail {
 
 async function getJson<T>(url: string, revalidate: number): Promise<T | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
+  const timer = setTimeout(() => controller.abort(), 10000);
   try {
     const res = await fetch(url, {
       headers: HEADERS,
       signal: controller.signal,
-      next: { revalidate },
+      // Chronogolf tee sheets change minute-by-minute. On Netlify, Next's
+      // provider-level data cache can hold an empty sheet from a prior request,
+      // so keep these upstream reads outside that cache and rely on our small
+      // in-process directory/course caches instead.
+      cache: "no-store",
     });
+    void revalidate;
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
