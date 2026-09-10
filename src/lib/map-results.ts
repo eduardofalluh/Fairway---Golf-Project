@@ -4,6 +4,7 @@ import type { TeeTimeResult } from "./types";
 export function selectMapTeeTimes(results: TeeTimeResult[]): TeeTimeResult[] {
   const selected = new Map<string, TeeTimeResult>();
   for (const result of results) {
+    if (result.source !== "live") continue;
     const previous = selected.get(result.courseId);
     if (!previous || result.deltaMinutes < previous.deltaMinutes ||
         (result.deltaMinutes === previous.deltaMinutes && result.price < previous.price)) {

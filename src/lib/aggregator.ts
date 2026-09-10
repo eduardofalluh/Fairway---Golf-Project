@@ -4,7 +4,6 @@ import {
   getChronogolfCourses,
 } from "./providers/chronogolf";
 import { fetchTeeTimeCourseTeeTimes } from "./providers/teetime";
-import { generateEstimatedTeeTimes } from "./providers/seed";
 import type { GolfCourse, MarketId, SearchQuery, TeeTime, TeeTimeResult } from "./types";
 import { todayISO } from "./format";
 
@@ -106,8 +105,9 @@ async function mapLimit<T, R>(
 }
 
 /**
- * Gather tee times for a date across the (pre-filtered) courses: real live
- * Chronogolf availability where the sheet is open, estimated times otherwise.
+ * Gather tee times for a date across the pre-filtered courses. Fairway only
+ * returns provider-confirmed live rows; unavailable feeds or closed sheets add
+ * no rows rather than generating prices.
  */
 async function gatherTeeTimes(
   courses: GolfCourse[],
@@ -129,8 +129,7 @@ async function gatherTeeTimes(
         live = null;
       }
     }
-    if (live !== null) return live;
-    return generateEstimatedTeeTimes(course, date);
+    return live ?? [];
   });
   return perCourse.flat();
 }
@@ -160,7 +159,7 @@ export function applySearch(
     if (typeof query.maxPrice === "number" && t.price > query.maxPrice) continue;
     if (typeof query.minPrice === "number" && t.price < query.minPrice) continue;
     if (query.cartOnly && !t.cart) continue;
-    if (query.liveOnly && t.source !== "live") continue;
+    if (t.source !== "live") continue;
 
     const course = byId.get(t.courseId);
     if (!course) continue;

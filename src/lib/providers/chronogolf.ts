@@ -25,7 +25,7 @@ import type { MarketId } from "../types";
  *
  * This is unofficial: endpoints can change, are best-effort, and a course's
  * tee sheet is only "open" inside its booking window (otherwise empty). All
- * failures fail soft — the aggregator falls back to estimated times.
+ * failures fail soft — the aggregator shows no availability for that course.
  */
 
 const BASE = "https://www.chronogolf.com/marketplace/v2";

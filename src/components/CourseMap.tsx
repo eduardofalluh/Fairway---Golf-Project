@@ -21,11 +21,10 @@ export type MapCourse = {
 };
 
 /**
- * Leaflet map of the search results — one dot per course, lime = live
- * availability, muted = estimate. Renders the user's location (blue dot) when
- * known and fits the view to everything. Client-only (dynamic import), uses
- * free OpenStreetMap tiles (no API key), and circleMarkers so there are no
- * marker-image assets to bundle.
+ * Leaflet map of provider-confirmed search results — one dot per course.
+ * Renders the user's location (blue dot) when known and fits the view to
+ * everything. Client-only (dynamic import), uses free OpenStreetMap tiles
+ * (no API key), and circleMarkers so there are no marker-image assets to bundle.
  */
 export function CourseMap({
   courses,
@@ -65,18 +64,18 @@ export function CourseMap({
       for (const c of courses) {
         if (typeof c.lat !== "number" || typeof c.lng !== "number") continue;
         const marker = L.circleMarker([c.lat, c.lng], {
-          radius: c.live ? 9 : 6,
+          radius: 9,
           color: "#07110b",
           weight: 1.5,
-          fillColor: c.live ? "#c6f24a" : "#9fb7a8",
-          fillOpacity: c.live ? 0.95 : 0.7,
+          fillColor: "#c6f24a",
+          fillOpacity: 0.95,
         }).addTo(group);
         const popup = document.createElement("div");
         popup.style.cssText = "font-family:system-ui;min-width:170px;color:#123526";
         const name = document.createElement("strong");
         name.textContent = c.name;
         const detail = document.createElement("p");
-        detail.textContent = `${c.live ? (lang === "fr" ? "Direct" : "Live") : (lang === "fr" ? "Estimation" : "Estimate")} · ${c.time} · ${c.holes} ${lang === "fr" ? "trous" : "holes"} · $${c.price} CAD`;
+        detail.textContent = `${lang === "fr" ? "Direct" : "Live"} · ${c.time} · ${c.holes} ${lang === "fr" ? "trous" : "holes"} · $${c.price} CAD`;
         popup.append(name, detail);
         if (c.distanceKm != null) {
           const distance = document.createElement("p");

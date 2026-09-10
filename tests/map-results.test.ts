@@ -6,7 +6,7 @@ import { formatPrice } from '../src/lib/format';
 import type { TeeTimeResult } from '../src/lib/types';
 
 test('map time, round and price come from the same selected slot', () => {
-  const early = { id:'early',courseId:'one',deltaMinutes:60,time:'12:00',price:30,holes:9,bookingUrl:'https://example.com/9' } as TeeTimeResult;
+  const early = { id:'early',courseId:'one',deltaMinutes:60,time:'12:00',price:30,holes:9,bookingUrl:'https://example.com/9',source:'live' } as TeeTimeResult;
   const nearest = { ...early,id:'nearest',deltaMinutes:0,time:'13:00',price:70,holes:18,bookingUrl:'https://example.com/18' };
   assert.deepEqual(selectMapTeeTimes([early,nearest]),[nearest]);
   assert.deepEqual(selectMapTeeTimes([nearest,early]),[nearest]);

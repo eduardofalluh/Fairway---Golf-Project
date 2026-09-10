@@ -100,7 +100,7 @@ export interface TeeTime {
   players: number;
   holes: number;
   cart: boolean;
-  /** "live" = real Chronogolf availability; "estimate" = generated fallback */
+  /** "live" = provider-confirmed availability. */
   source: "live" | "estimate";
   bookingUrl: string;
 }

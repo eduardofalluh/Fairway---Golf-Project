@@ -46,7 +46,7 @@ export function parseSearchQuery(params: URLSearchParams): SearchQuery {
     maxDistanceKm: number("distance", 0, 500),
     regions: regions as Region[] | undefined,
     cartOnly: params.get("cart") === "1",
-    liveOnly: params.get("live") !== "0",
+    liveOnly: true,
     publicOnly: params.get("public") === "1",
     sort: sort as SearchQuery["sort"],
   };

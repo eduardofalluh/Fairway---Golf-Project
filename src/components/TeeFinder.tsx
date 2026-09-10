@@ -58,7 +58,6 @@ type SearchValues = {
   maxPrice: number;
   regions: Region[];
   publicOnly: boolean;
-  liveOnly: boolean;
   sort: SortKey;
 };
 
@@ -96,7 +95,6 @@ export function TeeFinder() {
   const [maxPrice, setMaxPrice] = useState(140);
   const [regions, setRegions] = useState<Region[]>([]);
   const [publicOnly, setPublicOnly] = useState(false);
-  const [liveOnly, setLiveOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("price-asc");
 
   const [data, setData] = useState<SearchResponse | null>(null);
@@ -159,7 +157,6 @@ export function TeeFinder() {
         maxPrice: ov?.maxPrice ?? maxPrice,
         regions: ov?.regions ?? regions,
         publicOnly: ov?.publicOnly ?? publicOnly,
-        liveOnly: ov?.liveOnly ?? liveOnly,
         sort: ov?.sort ?? sort,
       };
       const params = new URLSearchParams({
@@ -171,7 +168,7 @@ export function TeeFinder() {
         holes: v.holes,
         max: String(v.maxPrice),
         sort: v.sort,
-        live: v.liveOnly ? "1" : "0",
+        live: "1",
       });
       if (v.useTarget) params.set("target", String(v.targetPrice));
       if (v.regions.length) params.set("regions", v.regions.join(","));
@@ -198,7 +195,7 @@ export function TeeFinder() {
         if (requestRef.current === controller) setLoading(false);
       }
     },
-    [date, market, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, liveOnly, sort, t.search.genericError, t.search.serviceError],
+    [date, market, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, sort, t.search.genericError, t.search.serviceError],
   );
 
   // initial load so the page is never empty
@@ -315,16 +312,12 @@ export function TeeFinder() {
         <div className="mb-7 flex flex-col gap-3 rounded-2xl bg-base px-4 py-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-cream">{t.search.availabilityTitle}</p>
-            <p className="mt-0.5 text-xs text-fog">
-              {liveOnly
-                ? t.search.liveOnlyBody
-                : t.search.liveEstimateBody}
-            </p>
+            <p className="mt-0.5 text-xs text-fog">{t.search.liveOnlyBody}</p>
           </div>
-          <button type="button" onClick={() => setLiveOnly((value) => !value)} aria-pressed={!liveOnly} className={`inline-flex min-h-11 w-full items-center justify-center gap-3 rounded-full border px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] transition sm:w-auto sm:justify-between ${!liveOnly ? "border-forest bg-forest text-white" : "border-line bg-surface text-fog hover:border-forest"}`}>
-            <span className={`h-2 w-2 rounded-full ${!liveOnly ? "bg-lime" : "bg-fog/40"}`} />
-            {liveOnly ? t.search.liveOnly : t.search.liveEstimates}
-          </button>
+          <span className="inline-flex min-h-11 w-full items-center justify-center gap-3 rounded-full border border-forest bg-forest px-4 py-2.5 text-xs font-bold uppercase tracking-[.08em] text-white sm:w-auto sm:justify-between">
+            <span className="h-2 w-2 rounded-full bg-lime" />
+            {t.search.liveOnly}
+          </span>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
           <Field label={t.search.date}>
@@ -657,12 +650,7 @@ export function TeeFinder() {
 
             {data.results.length === 0 && !error && (
               <div className="rounded-2xl border border-line bg-surface p-10 text-center text-fog">
-                <p>{t.search.noMatches(liveOnly)}</p>
-                {liveOnly && (
-                  <button type="button" onClick={() => { setLiveOnly(false); runSearch(true, { liveOnly: false }); }} className="mt-5 rounded-full border border-forest px-5 py-2.5 text-xs font-bold uppercase tracking-[.1em] text-forest transition hover:bg-forest hover:text-white">
-                    {t.search.includeEstimates}
-                  </button>
-                )}
+                <p>{t.search.noMatches()}</p>
               </div>
             )}
 
@@ -671,8 +659,7 @@ export function TeeFinder() {
                 <CourseMap courses={mapCourses} user={userLoc} />
                 <p className="mt-3 text-center text-xs text-fog">
                   {mapCourses.length} {lang === "fr" ? "parcours" : "courses"} ·{" "}
-                  <span className="font-semibold text-forest">{t.search.liveLegend}</span> vs{" "}
-                  <span className="text-fog">{t.search.estimateLegend}</span>
+                  <span className="font-semibold text-forest">{t.search.liveLegend}</span>
                   {" · "}{userLoc ? (lang === "fr" ? "le point bleu, c’est vous" : "blue dot is you") : (lang === "fr" ? "touchez « Utiliser ma position » pour mesurer la distance" : "tap “Use my location” to measure distance")}
                   {lang === "fr" ? ". Touchez un point pour voir les heures et réserver." : ". Tap a dot for times & booking."}
                 </p>
@@ -788,7 +775,7 @@ function ResultCard({
   const provider = getBookingProvider(r.bookingUrl);
   const handoffUrl = safeBookingUrl(r.bookingUrl);
   const showConnectedBooking =
-    providerConnected && provider.id !== "course" && Boolean(handoffUrl);
+    isLive && providerConnected && provider.id !== "course" && Boolean(handoffUrl);
   return (
     <div
       className={`group flex flex-col gap-4 rounded-2xl border p-5 transition hover:bg-surface sm:flex-row sm:items-center ${
@@ -820,10 +807,10 @@ function ResultCard({
               </span>
             ) : (
               <span
-                title={t.search.estimatedTitle}
+                title={t.search.unavailableTitle}
                 className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog"
               >
-                {t.search.estimateBadge}
+                {t.search.unavailableBadge}
               </span>
             )}
             {showConnectedBooking && (
@@ -855,9 +842,15 @@ function ResultCard({
                 {t.search.onBudget}
               </span>
             )}
-            <span className="font-display text-xl font-extrabold text-cream sm:text-2xl">
-              {formatPrice(r.price)}
-            </span>
+            {isLive ? (
+              <span className="font-display text-xl font-extrabold text-cream sm:text-2xl">
+                {formatPrice(r.price)}
+              </span>
+            ) : (
+              <span className="text-sm font-semibold text-fog">
+                {t.search.unavailableBadge}
+              </span>
+            )}
           </div>
           <p className="text-xs text-fog">
             {isLive ? (
@@ -868,32 +861,23 @@ function ResultCard({
                 </span>
               </>
             ) : (
-              t.search.estimatedPerPlayer
+              t.search.unavailablePerPlayer
             )}
           </p>
         </div>
-        {showConnectedBooking ? (
-          <a
-            href={handoffUrl ?? undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-forest sm:px-5 shadow-[0_10px_24px_rgba(198,242,74,0.22)] transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime"
-            aria-label={t.search.bookWithConnected(r.course.name, provider.name)}
-          >
-            {t.search.bookWith(provider.name)}
-          </a>
-        ) : (
+        {isLive ? (
           <button
             type="button"
             onClick={onBook}
-            className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition sm:px-5 ${
-              isLive
-                ? "bg-forest text-white hover:bg-forest-soft"
-                : "border border-forest/40 bg-transparent text-forest hover:bg-forest hover:text-white"
-            }`}
+            aria-label={showConnectedBooking ? t.search.bookWithConnected(r.course.name, provider.name) : undefined}
+            className="shrink-0 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-soft sm:px-5"
           >
-            {isLive ? t.search.review : t.search.check}
+            {showConnectedBooking ? t.search.bookWith(provider.name) : t.search.review}
           </button>
+        ) : (
+          <span className="shrink-0 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-fog sm:px-5">
+            {t.search.unavailable}
+          </span>
         )}
       </div>
     </div>

@@ -57,6 +57,9 @@ export function BookingModal({
   const [emailState, setEmailState] = useState<"idle" | "sending" | "sent">(
     "idle",
   );
+  const [bookingState, setBookingState] = useState<"idle" | "verifying" | "opened">("idle");
+  const [bookingError, setBookingError] = useState("");
+  const [verifiedUrl, setVerifiedUrl] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
@@ -76,6 +79,9 @@ export function BookingModal({
     setEmail(profile?.email ?? "");
     setEmailError("");
     setEmailState("idle");
+    setBookingState("idle");
+    setBookingError("");
+    setVerifiedUrl(null);
     // Saving the contact during delivery must not reset this open dialog.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tee]);
@@ -127,6 +133,10 @@ export function BookingModal({
 
   async function emailMe() {
     if (!tee) return;
+    if (tee.source !== "live") {
+      setEmailError(t.booking.verificationFailed);
+      return;
+    }
     if (!EMAIL_RE.test(email.trim()))
       return setEmailError(t.booking.invalidEmail);
     setEmailError("");
@@ -141,12 +151,13 @@ export function BookingModal({
           course: tee.course.name,
           city: tee.course.city,
           date: tee.date,
-          time: formatTime12(tee.time),
+          time: tee.time,
           holes: tee.holes,
           players: tee.players,
           price: tee.price,
           bookingUrl: tee.bookingUrl,
           source: tee.source,
+          courseData: tee.course,
         }),
       });
       const result = (await response.json().catch(() => null)) as {
@@ -170,9 +181,55 @@ export function BookingModal({
     }
   }
 
+  async function verifyAndContinue() {
+    if (!tee || !handoffUrl) return;
+    if (tee.source !== "live") {
+      setBookingError(t.booking.verificationFailed);
+      return;
+    }
+    setBookingState("verifying");
+    setBookingError("");
+    setVerifiedUrl(null);
+    try {
+      const response = await fetch("/api/autobook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: tee.date,
+          time: tee.time,
+          holes: tee.holes,
+          players: tee.players,
+          price: tee.price,
+          source: tee.source,
+          bookingUrl: tee.bookingUrl,
+          course: tee.course,
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        bookingUrl?: string;
+        note?: string;
+        error?: string;
+      } | null;
+      if (!response.ok || !result?.ok || !result.bookingUrl) {
+        throw new Error(result?.note ?? result?.error ?? t.booking.verificationFailed);
+      }
+      setOpened(true);
+      setBookingState("opened");
+      setVerifiedUrl(result.bookingUrl);
+      const popup = window.open(result.bookingUrl, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        setBookingError(result.note ?? "");
+      }
+    } catch (error) {
+      setBookingState("idle");
+      setBookingError(error instanceof Error ? error.message : t.booking.verificationFailed);
+    }
+  }
+
   const time = tee ? formatTime12(tee.time) : "";
   const provider = tee ? getBookingProvider(tee.bookingUrl) : null;
-  const handoffUrl = tee ? safeBookingUrl(tee.bookingUrl) : null;
+  const handoffUrl = tee && tee.source === "live" ? safeBookingUrl(tee.bookingUrl) : null;
   const providerName =
     provider?.id === "course" ? tee?.course.name : provider?.name;
   const providerConnected = Boolean(
@@ -248,7 +305,7 @@ export function BookingModal({
                 <div className="col-span-2 flex items-center justify-between border-t pt-3" style={{ borderColor: C.line }}>
                   <span className="text-xs" style={{ color: C.fog }}>{t.booking.greenFee}</span>
                   <span className="font-display text-2xl font-extrabold" style={{ color: C.cream }}>
-                    {formatPrice(tee.price)}
+                    {tee.source === "live" ? formatPrice(tee.price) : t.booking.unavailableFee}
                   </span>
                 </div>
               </div>
@@ -266,17 +323,27 @@ export function BookingModal({
                     {t.booking.providerConfirms}
                   </p>
                   {handoffUrl ? (
-                    <a
-                      href={handoffUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setOpened(true)}
-                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-display text-lg font-bold transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
-                      style={{ backgroundColor: C.lime, color: C.base }}
-                    >
-                      {providerConnected ? t.booking.bookWith(providerName ?? "provider") : t.booking.continueOn(providerName ?? "provider")}
-                      <ExternalLink aria-hidden="true" size={20} />
-                    </a>
+                    <>
+                      <button
+                        type="button"
+                        onClick={verifyAndContinue}
+                        disabled={bookingState === "verifying"}
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-display text-lg font-bold transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        style={{ backgroundColor: C.lime, color: C.base }}
+                      >
+                        {bookingState === "verifying"
+                          ? t.booking.verifyingProvider
+                          : providerConnected
+                            ? t.booking.bookWith(providerName ?? "provider")
+                            : t.booking.continueOn(providerName ?? "provider")}
+                        <ExternalLink aria-hidden="true" size={20} />
+                      </button>
+                      {bookingError ? (
+                        <p role="alert" className="mt-3 rounded-xl border p-3 text-sm" style={{ borderColor: C.line, color: C.fog }}>
+                          {bookingError}
+                        </p>
+                      ) : null}
+                    </>
                   ) : (
                     <p className="mt-4 rounded-xl border p-4 text-sm" style={{ borderColor: C.line, color: C.fog }}>
                       {t.booking.invalidLink}
@@ -297,7 +364,7 @@ export function BookingModal({
                     {t.booking.noReservation}
                   </p>
                   <a
-                    href={handoffUrl ?? undefined}
+                    href={verifiedUrl ?? handoffUrl ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border py-3 font-semibold transition hover:bg-white/5"

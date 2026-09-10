@@ -113,7 +113,7 @@ type Copy = {
     closest: string;
     liveNow: string;
     sortNearest: string;
-    noMatches: (liveOnly: boolean) => string;
+    noMatches: () => string;
     includeEstimates: string;
     mapCaption: (count: number, hasUser: boolean) => string;
     liveLegend: string;
@@ -121,8 +121,10 @@ type Copy = {
     showingTop: (shown: number, total: number) => string;
     confirmedTitle: string;
     estimatedTitle: string;
+    unavailableTitle: string;
     liveBadge: string;
     estimateBadge: string;
+    unavailableBadge: string;
     connectedBadge: string;
     distanceFromYou: (km: number, minutes: number) => string;
     cart: string;
@@ -130,6 +132,8 @@ type Copy = {
     perPlayer: string;
     spotsOpen: (spots: number) => string;
     estimatedPerPlayer: string;
+    unavailablePerPlayer: string;
+    unavailable: string;
     bookWithConnected: (course: string, provider: string) => string;
     bookWith: (provider: string) => string;
     review: string;
@@ -150,6 +154,7 @@ type Copy = {
     where: string;
     round: string;
     greenFee: string;
+    unavailableFee: string;
     players: (count: number) => string;
     holes: (count: number) => string;
     liveIntro: string;
@@ -158,6 +163,8 @@ type Copy = {
     contextualIntro: string;
     checkIntro: string;
     providerConfirms: string;
+    verifyingProvider: string;
+    verificationFailed: string;
     invalidLink: string;
     bookWith: (provider: string) => string;
     continueOn: (provider: string) => string;
@@ -286,15 +293,15 @@ export const copy: Record<Language, Copy> = {
       loadingMap: "Loading map…",
       eyebrow: (area) => `Search ${area}`,
       title: "Your time. Your price.\nEvery fairway.",
-      body: "Compare every useful option first. Provider-confirmed slots appear live, and estimates stay clearly labeled.",
+      body: "Compare every useful option first. Only provider-confirmed slots appear here, so prices and times come from live booking sheets.",
       marketArea: { montreal: "Greater Montréal", toronto: "Toronto + GTA" },
       availabilityTitle: "Availability quality",
       liveOnlyBody:
-        "Only provider-confirmed slots are shown. Include estimates when providers have not opened their sheets yet.",
+        "Only provider-confirmed slots are shown. If a provider has not opened its tee sheet or the slot disappeared, Fairway shows no card.",
       liveEstimateBody:
-        "Showing live slots plus labeled estimates. Switch to live-only when you want provider-confirmed inventory only.",
+        "Only provider-confirmed slots are shown. If a provider has not opened its tee sheet or the slot disappeared, Fairway shows no card.",
       liveOnly: "Live only",
-      liveEstimates: "Live + estimates",
+      liveEstimates: "Live only",
       date: "Date",
       preferredTime: "I want to play around",
       players: "Players",
@@ -312,9 +319,9 @@ export const copy: Record<Language, Copy> = {
       updating: "Updating tee times…",
       resultHeading: (total, courses) =>
         `${total} tee ${total === 1 ? "time" : "times"} · ${courses} ${courses === 1 ? "course" : "courses"}`,
-      rangeFrom: (liveRows) => (liveRows === 0 ? "Estimated from" : "From"),
-      resultSummary: (liveRows, total) =>
-        `${liveRows} live provider ${liveRows === 1 ? "slot" : "slots"}${total > liveRows ? ` · ${total - liveRows} generated estimates` : ""}`,
+      rangeFrom: () => "From",
+      resultSummary: (liveRows) =>
+        `${liveRows} live provider ${liveRows === 1 ? "slot" : "slots"}`,
       noResultsMeta: "No results match this search. Availability can change; check again or adjust your filters.",
       locationUnavailable: "Location isn't available in this browser.",
       locationError: "Couldn't get your location — allow it and try again.",
@@ -338,25 +345,29 @@ export const copy: Record<Language, Copy> = {
       closest: "Closest to you",
       liveNow: "live now",
       sortNearest: "Sort by nearest →",
-      noMatches: (liveOnly) =>
-        `No ${liveOnly ? "live slots" : "results"} match those filters. Try another time, region, or budget.`,
-      includeEstimates: "Include labeled estimates",
+      noMatches: () =>
+        "No provider-confirmed tee times match those filters. Try another time, region, or budget.",
+      includeEstimates: "Show only provider-confirmed slots",
       mapCaption: (count, hasUser) =>
         `${count} courses · ${hasUser ? "blue dot is you" : "tap “Use my location” to measure distance"}. Tap a dot for times & booking.`,
       liveLegend: "● live",
-      estimateLegend: "● estimated",
+      estimateLegend: "",
       showingTop: (_shown, total) => `Showing the top 60 of ${total}. Tighten your filters to narrow it down.`,
       confirmedTitle: "Confirmed on the course's live tee sheet right now",
-      estimatedTitle: "Estimated — this date's live sheet isn't open yet; confirm on the course's site",
+      estimatedTitle: "Not provider-confirmed",
+      unavailableTitle: "Not provider-confirmed, so Fairway will not offer this as bookable",
       liveBadge: "● Live",
-      estimateBadge: "Est.",
+      estimateBadge: "Unavailable",
+      unavailableBadge: "Unavailable",
       connectedBadge: "Connected",
       distanceFromYou: (km, minutes) => `📍 ${km} km · ~${minutes} min`,
       cart: "cart",
       onBudget: "On budget",
       perPlayer: "per player",
       spotsOpen: (spots) => `${spots} ${spots === 1 ? "spot" : "spots"} open`,
-      estimatedPerPlayer: "estimated · per player",
+      estimatedPerPlayer: "not provider-confirmed",
+      unavailablePerPlayer: "not provider-confirmed",
+      unavailable: "Unavailable",
       bookWithConnected: (course, provider) => `Book ${course} with connected ${provider} account`,
       bookWith: (provider) => `Book with ${provider} ↗`,
       review: "Review",
@@ -369,7 +380,7 @@ export const copy: Record<Language, Copy> = {
       srDescription: "Review this tee time and continue to the provider to complete the reservation.",
       close: "Close booking details",
       available: "Available tee time",
-      estimated: "Estimated tee time",
+      estimated: "Unavailable tee time",
       live: "Live",
       est: "Est.",
       date: "Date",
@@ -377,19 +388,22 @@ export const copy: Record<Language, Copy> = {
       where: "Where",
       round: "Round",
       greenFee: "Green fee · per player",
+      unavailableFee: "Not confirmed",
       players: (count) => `${count} ${count === 1 ? "player" : "players"}`,
       holes: (count) => `${count} holes`,
-      liveIntro: "This tee time was available when Fairway last checked.",
+      liveIntro: "Fairway will re-check this exact tee time with the provider before opening checkout.",
       estimateIntro:
-        "This is a generated planning estimate, not confirmed availability. Check actual times and prices with the provider.",
+        "This tee time is not provider-confirmed, so Fairway will not prepare it for booking.",
       connectedIntro: (provider) =>
         `Your ${provider} account is marked connected on this device, so this opens the provider booking page in one click.`,
       contextualIntro: "Your date and round length are included in the booking link.",
       checkIntro: "Check the date, time, player count, and price on the next page.",
       providerConfirms: "The provider still confirms the reservation and payment.",
+      verifyingProvider: "Verifying live availability…",
+      verificationFailed: "This slot changed on the provider site. Search again before booking.",
       invalidLink: "This course does not have a valid booking link yet.",
-      bookWith: (provider) => `Book with ${provider}`,
-      continueOn: (provider) => `Continue on ${provider}`,
+      bookWith: (provider) => `Verify and continue on ${provider}`,
+      continueOn: (provider) => `Verify and continue on ${provider}`,
       opened: (provider) => `${provider} opened`,
       checkStep: (date, time) => `Check ${date} at ${time}`,
       connectedStep: "Your provider account is already marked connected here",
@@ -442,8 +456,8 @@ export const copy: Record<Language, Copy> = {
       faqIntro:
         "The app keeps discovery, provider sign-in, and booking handoff together, while final confirmation stays on the provider page.",
       faqs: [
-        { q: "Are all results live?", a: "The search starts with live slots plus clearly marked estimates so you can compare options right away. Use the live-only filter when you want provider-confirmed inventory only." },
-        { q: "Where does availability come from?", a: "Chronogolf and TeeTime availability can appear live when their tee sheets are reachable. Other listed provider and course options are shown as clearly marked estimates until you verify them on the booking page." },
+        { q: "Are all results live?", a: "Yes. Fairway now shows only provider-confirmed tee times. If a provider sheet is closed, unavailable, or the slot disappears, that card is not shown." },
+        { q: "Where does availability come from?", a: "Chronogolf and TeeTime availability appears only when their live tee sheets are reachable. Other provider account cards remain secure sign-in handoffs, but they do not create tee-time cards." },
         { q: "How does the time window work?", a: "Choose your ideal tee time and up to three hours of flexibility in either direction. Fairway returns matching slots and lets you sort the list your way." },
         { q: "Does Fairway complete the payment?", a: "You review the final details, sign in on the provider page, and complete payment there. The provider sends the booking confirmation." },
       ],
@@ -537,15 +551,15 @@ export const copy: Record<Language, Copy> = {
       loadingMap: "Chargement de la carte…",
       eyebrow: (area) => `Recherche ${area}`,
       title: "Votre heure. Votre prix.\nTous les fairways.",
-      body: "Comparez d’abord toutes les bonnes options. Les départs confirmés par les fournisseurs apparaissent en direct, et les estimations restent clairement indiquées.",
+      body: "Comparez d’abord toutes les bonnes options. Seuls les départs confirmés par les fournisseurs apparaissent ici, avec des prix et heures tirés des feuilles de réservation en direct.",
       marketArea: { montreal: "Grand Montréal", toronto: "Toronto + RGT" },
       availabilityTitle: "Qualité de la disponibilité",
       liveOnlyBody:
-        "Seuls les départs confirmés par les fournisseurs sont affichés. Ajoutez les estimations quand les fournisseurs n’ont pas encore ouvert leurs feuilles.",
+        "Seuls les départs confirmés par les fournisseurs sont affichés. Si la feuille n’est pas ouverte ou si le départ a disparu, Fairway ne montre pas de carte.",
       liveEstimateBody:
-        "Affiche les départs en direct et les estimations indiquées. Passez à direct seulement pour voir uniquement l’inventaire confirmé par les fournisseurs.",
+        "Seuls les départs confirmés par les fournisseurs sont affichés. Si la feuille n’est pas ouverte ou si le départ a disparu, Fairway ne montre pas de carte.",
       liveOnly: "Direct seulement",
-      liveEstimates: "Direct + estimations",
+      liveEstimates: "Direct seulement",
       date: "Date",
       preferredTime: "Je veux jouer vers",
       players: "Joueurs",
@@ -563,9 +577,9 @@ export const copy: Record<Language, Copy> = {
       updating: "Mise à jour des départs…",
       resultHeading: (total, courses) =>
         `${total} départ${total === 1 ? "" : "s"} · ${courses} parcours`,
-      rangeFrom: (liveRows) => (liveRows === 0 ? "Estimé à partir de" : "À partir de"),
-      resultSummary: (liveRows, total) =>
-        `${liveRows} départ${liveRows === 1 ? "" : "s"} fournisseur en direct${total > liveRows ? ` · ${total - liveRows} estimations générées` : ""}`,
+      rangeFrom: () => "À partir de",
+      resultSummary: (liveRows) =>
+        `${liveRows} départ${liveRows === 1 ? "" : "s"} fournisseur en direct`,
       noResultsMeta: "Aucun résultat ne correspond à cette recherche. La disponibilité peut changer; réessayez ou ajustez vos filtres.",
       locationUnavailable: "La localisation n’est pas disponible dans ce navigateur.",
       locationError: "Impossible d’obtenir votre position — autorisez-la et réessayez.",
@@ -589,25 +603,29 @@ export const copy: Record<Language, Copy> = {
       closest: "Le plus proche de vous",
       liveNow: "en direct",
       sortNearest: "Trier par proximité →",
-      noMatches: (liveOnly) =>
-        `Aucun ${liveOnly ? "départ en direct" : "résultat"} ne correspond à ces filtres. Essayez une autre heure, région ou budget.`,
-      includeEstimates: "Inclure les estimations indiquées",
+      noMatches: () =>
+        "Aucun départ confirmé par un fournisseur ne correspond à ces filtres. Essayez une autre heure, région ou budget.",
+      includeEstimates: "Afficher seulement les départs confirmés",
       mapCaption: (count, hasUser) =>
         `${count} parcours · ${hasUser ? "le point bleu, c’est vous" : "touchez « Utiliser ma position » pour mesurer la distance"}. Touchez un point pour voir les heures et réserver.`,
       liveLegend: "● direct",
-      estimateLegend: "● estimé",
+      estimateLegend: "",
       showingTop: (_shown, total) => `Affichage des 60 meilleurs sur ${total}. Resserrez les filtres pour réduire la liste.`,
       confirmedTitle: "Confirmé sur la feuille de départ en direct du parcours",
-      estimatedTitle: "Estimé — la feuille de cette date n’est pas encore ouverte; confirmez sur le site du parcours",
+      estimatedTitle: "Non confirmé par le fournisseur",
+      unavailableTitle: "Non confirmé par le fournisseur, donc Fairway ne l’offre pas comme réservable",
       liveBadge: "● Direct",
-      estimateBadge: "Est.",
+      estimateBadge: "Indisponible",
+      unavailableBadge: "Indisponible",
       connectedBadge: "Connecté",
       distanceFromYou: (km, minutes) => `📍 ${km} km · ~${minutes} min`,
       cart: "voiturette",
       onBudget: "Dans le budget",
       perPlayer: "par joueur",
       spotsOpen: (spots) => `${spots} place${spots === 1 ? "" : "s"} libre${spots === 1 ? "" : "s"}`,
-      estimatedPerPlayer: "estimé · par joueur",
+      estimatedPerPlayer: "non confirmé par le fournisseur",
+      unavailablePerPlayer: "non confirmé par le fournisseur",
+      unavailable: "Indisponible",
       bookWithConnected: (course, provider) => `Réserver ${course} avec le compte ${provider} connecté`,
       bookWith: (provider) => `Réserver avec ${provider} ↗`,
       review: "Voir",
@@ -620,7 +638,7 @@ export const copy: Record<Language, Copy> = {
       srDescription: "Vérifiez ce départ et continuez chez le fournisseur pour compléter la réservation.",
       close: "Fermer les détails de réservation",
       available: "Départ disponible",
-      estimated: "Départ estimé",
+      estimated: "Départ indisponible",
       live: "Direct",
       est: "Est.",
       date: "Date",
@@ -628,19 +646,22 @@ export const copy: Record<Language, Copy> = {
       where: "Lieu",
       round: "Ronde",
       greenFee: "Droit de jeu · par joueur",
+      unavailableFee: "Non confirmé",
       players: (count) => `${count} joueur${count === 1 ? "" : "s"}`,
       holes: (count) => `${count} trous`,
-      liveIntro: "Ce départ était disponible lors de la dernière vérification de Fairway.",
+      liveIntro: "Fairway revérifie ce départ exact chez le fournisseur avant d’ouvrir la réservation.",
       estimateIntro:
-        "Il s’agit d’une estimation de planification, pas d’une disponibilité confirmée. Vérifiez les heures et les prix réels chez le fournisseur.",
+        "Ce départ n’est pas confirmé par le fournisseur, donc Fairway ne le prépare pas pour la réservation.",
       connectedIntro: (provider) =>
         `Votre compte ${provider} est marqué connecté sur cet appareil; la page de réservation du fournisseur s’ouvre donc en un clic.`,
       contextualIntro: "La date et la durée de la ronde sont incluses dans le lien de réservation.",
       checkIntro: "Vérifiez la date, l’heure, le nombre de joueurs et le prix sur la page suivante.",
       providerConfirms: "Le fournisseur confirme quand même la réservation et le paiement.",
+      verifyingProvider: "Vérification de la disponibilité en direct…",
+      verificationFailed: "Ce départ a changé sur le site du fournisseur. Relancez la recherche avant de réserver.",
       invalidLink: "Ce parcours n’a pas encore de lien de réservation valide.",
-      bookWith: (provider) => `Réserver avec ${provider}`,
-      continueOn: (provider) => `Continuer sur ${provider}`,
+      bookWith: (provider) => `Vérifier et continuer sur ${provider}`,
+      continueOn: (provider) => `Vérifier et continuer sur ${provider}`,
       opened: (provider) => `${provider} ouvert`,
       checkStep: (date, time) => `Vérifiez ${date} à ${time}`,
       connectedStep: "Votre compte fournisseur est déjà marqué connecté ici",
@@ -693,8 +714,8 @@ export const copy: Record<Language, Copy> = {
       faqIntro:
         "L’app garde la découverte, la connexion aux fournisseurs et la redirection de réservation ensemble, pendant que la confirmation finale reste sur la page du fournisseur.",
       faqs: [
-        { q: "Tous les résultats sont-ils en direct?", a: "La recherche commence avec les départs en direct et des estimations clairement indiquées pour comparer tout de suite. Utilisez le filtre direct seulement pour voir uniquement l’inventaire confirmé par les fournisseurs." },
-        { q: "D’où vient la disponibilité?", a: "La disponibilité Chronogolf et TeeTime peut apparaître en direct lorsque leurs feuilles de départ sont accessibles. Les autres fournisseurs et parcours sont affichés comme estimations claires jusqu’à ce que vous les vérifiiez sur la page de réservation." },
+        { q: "Tous les résultats sont-ils en direct?", a: "Oui. Fairway affiche seulement les départs confirmés par les fournisseurs. Si une feuille est fermée, inaccessible ou si le départ disparaît, la carte n’est pas affichée." },
+        { q: "D’où vient la disponibilité?", a: "Les disponibilités Chronogolf et TeeTime apparaissent seulement quand leurs feuilles en direct sont accessibles. Les autres cartes de fournisseurs restent des liens de connexion sécurisés, sans créer de cartes de départ." },
         { q: "Comment fonctionne la fenêtre horaire?", a: "Choisissez votre heure idéale et jusqu’à trois heures de flexibilité de chaque côté. Fairway retourne les départs correspondants et vous laisse trier la liste à votre façon." },
         { q: "Fairway complète-t-il le paiement?", a: "Vous vérifiez les derniers détails, vous vous connectez sur la page du fournisseur et vous payez là-bas. Le fournisseur envoie la confirmation de réservation." },
       ],

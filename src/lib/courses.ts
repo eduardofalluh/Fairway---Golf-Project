@@ -8,7 +8,7 @@ export { MARKET_REGIONS, REGIONS } from "./types";
  * fill known GGGolf, MinuteGolf, ClubLink, and course-direct gaps. Toronto
  * entries add TeeTime live clubs plus official booking handoffs for municipal
  * and regional providers. When no live feed is available, tee times are clearly
- * labelled estimates and link out to the course's real booking page.
+ * provider handoffs and link out to the course's real booking page.
  */
 interface ExtraSeed {
   market: GolfCourse["market"];

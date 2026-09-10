@@ -4,7 +4,6 @@ import { parseSearchQuery } from '../src/lib/search-query';
 import { applySearch, search } from '../src/lib/aggregator';
 import { parseTeetimesResponse } from '../src/lib/providers/chronogolf';
 import { fetchTeeTimeCourseTeeTimes } from '../src/lib/providers/teetime';
-import { generateEstimatedTeeTimes } from '../src/lib/providers/seed';
 import type { GolfCourse, TeeTime } from '../src/lib/types';
 
 const params = (extra = '') => new URLSearchParams(`date=2099-07-10&time=13:00&${extra}`);
@@ -14,7 +13,7 @@ test('search defaults to real availability and lowest price', () => {
   const q = parseSearchQuery(params());
   assert.equal(q.liveOnly, true); assert.equal(q.sort, 'price-asc');
   assert.equal(q.market, 'montreal');
-  assert.equal(parseSearchQuery(params('live=0')).liveOnly, false);
+  assert.equal(parseSearchQuery(params('live=0')).liveOnly, true);
 });
 test('accepts Toronto market and rejects cross-market regions', () => {
   const toronto = parseSearchQuery(params('market=toronto&regions=North+GTA,East+GTA'));
@@ -55,7 +54,7 @@ test('preserves cents and rejects unavailable or mismatched live inventory', () 
   ] });
   assert.equal(rows.length, 1); assert.equal(rows[0].price, 55.75);
 });
-test('filters estimates, capacity, time and sorts comparable prices', () => {
+test('filters generated estimates, capacity, time and sorts comparable prices', () => {
   const base: TeeTime = { id:'a',courseId:'test',date:'2099-07-10',time:'13:00',minutes:780,price:60.5,players:4,holes:18,cart:false,source:'live',bookingUrl:course.bookingUrl };
   const rows = [base,{...base,id:'b',price:50.25},{...base,id:'estimate',source:'estimate' as const},{...base,id:'full',players:1},{...base,id:'late',minutes:1000}];
   const result=applySearch(rows,new Map([[course.id,course]]),parseSearchQuery(params()));
@@ -71,6 +70,7 @@ test('supports explicit distance and closest-price ordering after filters', () =
   const byId = new Map([[near.id, near], [far.id, far]]);
   const rows = [row('far-price', far.id, 59), row('near-price', near.id, 80)];
   const base = parseSearchQuery(params('live=0&max=80'));
+  assert.equal(base.liveOnly, true);
   assert.deepEqual(applySearch(rows, byId, { ...base, sort: 'distance' }).map(r => r.id), ['near-price', 'far-price']);
   assert.deepEqual(applySearch(rows, byId, { ...base, sort: 'closest-price', targetPrice: 60 }).map(r => r.id), ['far-price', 'near-price']);
 });
@@ -83,14 +83,6 @@ test('price, cart, holes and time bounds are inclusive', () => {
   const base: TeeTime = { id:'boundary',courseId:'test',date:'2099-07-10',time:'14:00',minutes:840,price:50,players:2,holes:18,cart:true,source:'live',bookingUrl:course.bookingUrl };
   const query = parseSearchQuery(params('window=60&players=2&holes=18&min=50&max=50&cart=1'));
   assert.deepEqual(applySearch([base], new Map([[course.id, course]]), query).map((r) => r.id), ['boundary']);
-});
-test('estimated schedules are deterministic and keep course round constraints', () => {
-  const nineOnly = { ...course, id: 'nine', holes: [9] };
-  const first = generateEstimatedTeeTimes(nineOnly, '2099-07-10');
-  const second = generateEstimatedTeeTimes(nineOnly, '2099-07-10');
-  assert.deepEqual(second, first);
-  assert.ok(first.length > 0);
-  assert.ok(first.every((row) => row.date === '2099-07-10' && row.holes === 9 && row.source === 'estimate'));
 });
 test('an explicitly open but empty provider sheet does not become invented availability', async () => {
   const originalFetch = globalThis.fetch;
@@ -115,6 +107,35 @@ test('an explicitly open but empty provider sheet does not become invented avail
   try {
     const response = await search(parseSearchQuery(params('live=0&players=1&window=180&max=1000')));
     assert.equal(response.results.filter((row) => row.courseId === 'mock-club').length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('provider outages never become generated tee times or mock prices', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url.includes('/marketplace/v2/search?')) {
+      return Response.json([{
+        uuid: 'st-rose', name: 'Golf Sainte-Rose', slug: 'golf-sainte-rose', holes: [18],
+        city: 'Laval', province: 'QC', country: 'Canada', weekday_price: 90, weekend_price: 110,
+        location: { lat: 45.61, lon: -73.78 }, online_booking_enabled: true,
+      }]);
+    }
+    if (url.includes('/marketplace/v2/clubs/golf-sainte-rose')) {
+      return Response.json({ courses: [{ uuid: 'course-st-rose', holes: 18 }] });
+    }
+    if (url.includes('/marketplace/v2/teetimes?')) {
+      return Response.json({ status: 'closed', teetimes: [] });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+  try {
+    const response = await search(parseSearchQuery(params('live=0&players=1&window=180&max=1000')));
+    assert.equal(response.results.length, 0);
+    assert.equal(response.meta.cheapest, null);
+    assert.equal(response.meta.liveRows, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }

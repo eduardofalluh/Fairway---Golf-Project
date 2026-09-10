@@ -11,21 +11,21 @@ fees in CAD, and continue to the course's booking provider.
 - Montréal and Toronto/GTA are selectable markets. Each market has its own
   regions, downtown-distance sorting, provider directory, and curated course
   handoffs.
-- The search UI starts with live Chronogolf/TeeTime availability plus clearly
-  labeled generated estimates so users see useful options right away. Users can
-  switch to live-only for provider-confirmed inventory. Estimates are not
-  available inventory or guaranteed prices, and cannot be booked within Fairway.
+- The search UI shows provider-confirmed Chronogolf/TeeTime availability only.
+  If a provider sheet is unavailable, closed, or the selected slot disappears,
+  Fairway shows no tee-time card instead of inventing a price.
 - Official Chronogolf, TeeTime, Golf the 6ix, GolfNow, MinuteGolf, and
   club-specific GGGolf account access open on the provider's site. Fairway does
   not receive passwords, inspect those browser sessions, or claim the accounts
   are linked. Users can mark a provider as connected on their own device after
   signing in, which changes the account card to a disabled connected state.
-- Connected providers unlock direct `Book with {Provider}` actions on matching
-  tee-time cards. Chronogolf, TeeTime, Golf the 6ix, GolfNow, and MinuteGolf
-  connections apply provider-wide; GGGolf connections apply to the selected club
-  portal. The provider still confirms availability, final price, payment, and
-  the reservation. Fairway does not make reservations or payments;
-  `/api/autobook` returns HTTP 501.
+- Connected providers unlock a guarded booking handoff on matching live tee-time
+  cards. Fairway re-checks the provider feed before opening checkout; if the
+  selected slot changed or disappeared, the handoff stops and the user searches
+  again. Chronogolf, TeeTime, Golf the 6ix, GolfNow, and MinuteGolf connections
+  apply provider-wide; GGGolf connections apply to the selected club portal. The
+  provider still confirms final price, payment, and the reservation. Fairway does
+  not store provider passwords or payment details.
 - Optional email is a selected-round reminder, never a booking confirmation.
   The UI only reports delivery if the email service accepts it.
 
@@ -69,8 +69,8 @@ retain cents, unknown capacity is not assumed available, and past tee times are
 excluded in the Eastern time zone.
 
 `src/lib/providers/teetime.ts` reads public TeeTime club pages for selected GTA
-clubs whose server-rendered page contains availability data. Failures fall back
-to labeled estimates instead of presenting fake live inventory.
+clubs whose server-rendered page contains availability data. Failures return no
+rows instead of presenting fake live inventory.
 
 Curated courses in `src/lib/courses.ts` include verified official booking portals
 for Montréal and Toronto/GTA. Where a directory-only live-provider listing
@@ -93,13 +93,13 @@ provider, email, or AI credentials are included in this deployment.
 ## Search API
 
 ```text
-GET /api/tee-times?market=toronto&date=2026-09-12&time=13:00&window=60&players=2&holes=18&max=100&sort=price-asc&live=0
+GET /api/tee-times?market=toronto&date=2026-09-12&time=13:00&window=60&players=2&holes=18&max=100&sort=price-asc
 ```
 
 Returns `{ results, meta }`. Set `market=montreal` or `market=toronto`; omitted
-market defaults to Montréal. Set `live=0` to explicitly include estimates.
-Invalid dates, times, player counts, market names, region names, sorting and
-price ranges return HTTP 400 before provider calls.
+market defaults to Montréal. `live=0` is ignored for safety; public search stays
+provider-confirmed only. Invalid dates, times, player counts, market names,
+region names, sorting and price ranges return HTTP 400 before provider calls.
 
 All prices and availability must be confirmed by the booking provider. Fairway is
 independent of every listed provider.
