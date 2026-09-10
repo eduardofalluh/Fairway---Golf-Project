@@ -3,16 +3,25 @@ import { test } from 'node:test';
 import { parseSearchQuery } from '../src/lib/search-query';
 import { applySearch, search } from '../src/lib/aggregator';
 import { parseTeetimesResponse } from '../src/lib/providers/chronogolf';
+import { fetchTeeTimeCourseTeeTimes } from '../src/lib/providers/teetime';
 import { generateEstimatedTeeTimes } from '../src/lib/providers/seed';
 import type { GolfCourse, TeeTime } from '../src/lib/types';
 
 const params = (extra = '') => new URLSearchParams(`date=2099-07-10&time=13:00&${extra}`);
-const course: GolfCourse = { id: 'test', name: 'Test course', city: 'Laval', region: 'Laval', holes: [18], distanceKm: 10, lat: 45.6, lng: -73.7, source: 'chronogolf', online: true, access: 'public', bookingUrl: 'https://www.chronogolf.com/club/test' };
+const course: GolfCourse = { id: 'test', market: 'montreal', name: 'Test course', city: 'Laval', region: 'Laval', holes: [18], distanceKm: 10, lat: 45.6, lng: -73.7, source: 'chronogolf', online: true, access: 'public', bookingUrl: 'https://www.chronogolf.com/club/test' };
 
 test('search defaults to real availability and lowest price', () => {
   const q = parseSearchQuery(params());
   assert.equal(q.liveOnly, true); assert.equal(q.sort, 'price-asc');
+  assert.equal(q.market, 'montreal');
   assert.equal(parseSearchQuery(params('live=0')).liveOnly, false);
+});
+test('accepts Toronto market and rejects cross-market regions', () => {
+  const toronto = parseSearchQuery(params('market=toronto&regions=North+GTA,East+GTA'));
+  assert.equal(toronto.market, 'toronto');
+  assert.deepEqual(toronto.regions, ['North GTA', 'East GTA']);
+  assert.throws(() => parseSearchQuery(params('market=toronto&regions=Laval')));
+  assert.throws(() => parseSearchQuery(params('market=vancouver')));
 });
 test('rejects invalid calendars, times, budgets and player counts', () => {
   for (const suffix of ['date=2026-02-30', 'time=25:99', 'players=NaN', 'players=5', 'players=1.5', 'window=-1', 'max=Infinity', 'min=100&max=50', 'regions=Unknown', 'holes=27', 'sort=anything']) {
@@ -106,6 +115,84 @@ test('an explicitly open but empty provider sheet does not become invented avail
   try {
     const response = await search(parseSearchQuery(params('live=0&players=1&window=180&max=1000')));
     assert.equal(response.results.filter((row) => row.courseId === 'mock-club').length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+test('TeeTime search results preserve provider date handoff', () => {
+  const teetimeCourse: GolfCourse = {
+    ...course,
+    id: 'extra-kirby-links-golf-course',
+    market: 'toronto',
+    name: 'Kirby Links Golf Course',
+    city: 'Maple',
+    region: 'North GTA',
+    source: 'teetime',
+    teeTimeSlug: 'kirby-links-golf-course',
+    bookingUrl: 'https://tee-time.com/clubs/kirby-links-golf-course',
+  };
+  const row: TeeTime = {
+    id: 'kirby-1300',
+    courseId: teetimeCourse.id,
+    date: '2099-07-10',
+    time: '13:00',
+    minutes: 780,
+    price: 35,
+    players: 4,
+    holes: 18,
+    cart: false,
+    source: 'live',
+    bookingUrl: 'https://tee-time.com/clubs/kirby-links-golf-course?date=2099-07-10',
+  };
+  const result = applySearch([row], new Map([[teetimeCourse.id, teetimeCourse]]), parseSearchQuery(params('market=toronto&live=1')));
+  assert.equal(result[0]?.bookingUrl, 'https://tee-time.com/clubs/kirby-links-golf-course?date=2099-07-10');
+});
+
+test('TeeTime pages parse into live GTA tee times', async () => {
+  const originalFetch = globalThis.fetch;
+  const torontoCourse: GolfCourse = {
+    id: 'extra-pickering-glen-golf-club',
+    market: 'toronto',
+    name: 'Pickering Glen Golf Club',
+    city: 'Pickering',
+    region: 'East GTA',
+    holes: [18],
+    distanceKm: 36,
+    lat: 43.921,
+    lng: -79.1859,
+    source: 'teetime',
+    teeTimeSlug: 'pickering-glen-golf-club',
+    online: true,
+    access: 'public',
+    bookingUrl: 'https://tee-time.com/clubs/pickering-glen-golf-club',
+  };
+  const payload = {
+    props: {
+      organization: {
+        availabilities: {
+          '1304': {
+            holes: '18',
+            priceFrom: 80,
+            group_size: '2',
+            teeTimes: [
+              { id: 123, course: 'Pickering', date: '2099-07-10 00:00:00', time: 1304, holes: 18, cart_mandatory: false, price: 80, group_size: 2 },
+            ],
+          },
+        },
+      },
+    },
+  };
+  globalThis.fetch = (async () => new Response(
+    `<div id="app" data-page="${JSON.stringify(payload).replaceAll('"', '&quot;')}"></div>`,
+    { status: 200, headers: { 'content-type': 'text/html' } },
+  )) as typeof fetch;
+  try {
+    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, '2099-07-10');
+    assert.equal(rows?.length, 1);
+    assert.equal(rows?.[0].source, 'live');
+    assert.equal(rows?.[0].time, '13:04');
+    assert.equal(rows?.[0].price, 80);
+    assert.equal(rows?.[0].players, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

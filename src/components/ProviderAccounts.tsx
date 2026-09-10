@@ -34,21 +34,22 @@ export function ProviderAccounts() {
               Connect your booking accounts first.
             </h2>
             <p className="mt-5 text-base leading-7 text-[#547164] sm:text-lg">
-              Open Chronogolf, MinuteGolf, or your club&apos;s GGGolf sign-in
-              page before you compare tee times. Fairway keeps the search in one
-              place while each provider handles its own secure login.
+              Open Chronogolf, TeeTime, Golf the 6ix, MinuteGolf, GolfNow, or
+              your club&apos;s GGGolf sign-in page before you compare tee times.
+              Fairway keeps the search in one place while each provider handles
+              its own secure login.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:justify-self-end">
             <AccountStat label="Chronogolf" value="Live tee times" />
-            <AccountStat label="MinuteGolf" value="Central login" />
-            <AccountStat label="GGGolf" value={`${GGGOLF_CLUB_PORTALS.length} verified portals`} />
+            <AccountStat label="TeeTime" value="Toronto live slots" />
+            <AccountStat label="Toronto" value="City + GTA links" />
             <AccountStat label="Connected" value={`${connectedCount} active`} emphasis />
           </div>
         </div>
 
-        <div className="mt-9 grid gap-4 md:grid-cols-3">
+        <div className="mt-9 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {PROVIDER_ACCOUNT_LINKS.map((provider) => {
             const selectedClub = GGGOLF_CLUB_PORTALS.find(
               (club) => club.href === gggolfPortal,
@@ -198,10 +199,11 @@ export function ProviderAccounts() {
         </div>
 
         <p className="mt-7 max-w-3xl text-sm leading-6 text-[#64776d]">
-          Fairway checks live Chronogolf tee sheets when they are available.
-          GGGolf serves many clubs, but Fairway only shows verified local login
-          portals here. In-app account linking and checkout are not available
-          yet, so complete and confirm your reservation with the provider.
+          Fairway checks live Chronogolf and TeeTime tee sheets when they are
+          available. Other provider cards are secure handoffs to the booking
+          system golfers already use. In-app account linking and checkout are
+          not available yet, so complete and confirm your reservation with the
+          provider.
         </p>
       </div>
     </section>

@@ -15,9 +15,9 @@ const body = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Fairway — Montréal tee times, one search",
+  title: "Fairway — Montréal and Toronto tee times",
   description:
-    "Compare live tee times and prices across golf courses in Greater Montréal, then continue to the booking provider.",
+    "Compare live and estimated tee times across Montréal and Toronto golf courses, then continue to the booking provider.",
 };
 
 export default function RootLayout({

@@ -3,11 +3,11 @@ import type { GolfCourse, TeeTime } from "../types";
 /**
  * Estimated tee-time provider (fallback).
  *
- * When Chronogolf has no live availability for a course+date — its tee sheet is
+ * When a provider has no live availability for a course+date — its tee sheet is
  * "closed" / outside the booking window, or the course isn't bookable online —
  * we generate a believable schedule so the UI is never empty. Output is
  * deterministic (seeded from course id + date) so it doesn't flicker across
- * refreshes, and it's anchored to the course's REAL Chronogolf weekday/weekend
+ * refreshes, and it's anchored to the course's real weekday/weekend
  * price when we have it. Always clearly labelled as "estimate" in the UI.
  */
 

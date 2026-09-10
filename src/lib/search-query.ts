@@ -1,4 +1,4 @@
-import { REGIONS, type Region, type SearchQuery } from "./types";
+import { MARKET_IDS, MARKET_REGIONS, REGIONS, type MarketId, type Region, type SearchQuery } from "./types";
 
 const SORTS = ["price-desc", "price-asc", "closest-time", "closest-price", "distance"];
 
@@ -6,6 +6,10 @@ const SORTS = ["price-desc", "price-asc", "closest-time", "closest-price", "dist
 export function parseSearchQuery(params: URLSearchParams): SearchQuery {
   const date = params.get("date") ?? "";
   const desiredTime = params.get("time") ?? "";
+  const market = params.get("market") ?? "montreal";
+  if (!MARKET_IDS.includes(market as MarketId)) {
+    throw new Error("Choose a valid golf market.");
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
       Number.isNaN(Date.parse(`${date}T12:00:00Z`)) ||
       new Date(`${date}T12:00:00Z`).toISOString().slice(0, 10) !== date)
@@ -25,13 +29,16 @@ export function parseSearchQuery(params: URLSearchParams): SearchQuery {
   const sort = params.get("sort") ?? "price-asc";
   if (!SORTS.includes(sort)) throw new Error("Choose a valid sort order.");
   const regions = params.get("regions")?.split(",").filter(Boolean);
-  if (regions?.some((r) => !REGIONS.includes(r as Region))) throw new Error("Choose a valid Montréal region.");
+  if (regions?.some((r) => !REGIONS.includes(r as Region))) throw new Error("Choose a valid golf region.");
+  if (regions?.some((r) => !MARKET_REGIONS[market as MarketId].includes(r as Region))) {
+    throw new Error("Choose a valid region for this market.");
+  }
   const minPrice = number("min", 0, 1000);
   const maxPrice = number("max", 0, 1000);
   if (minPrice != null && maxPrice != null && minPrice > maxPrice)
     throw new Error("Minimum price must be below the maximum price.");
   return {
-    date, desiredTime,
+    date, desiredTime, market: market as MarketId,
     windowMinutes: number("window", 0, 180, true) ?? 60,
     players: number("players", 1, 4, true) ?? 2,
     holes: holes === "any" ? "any" : holes === "9" ? 9 : 18,

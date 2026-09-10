@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { REGIONS } from "@/lib/types";
+import { MARKET_IDS, REGIONS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,7 @@ const FIELD_SPEC = `Return ONLY a JSON object with exactly these keys:
 - window: integer minutes 0–180 of flexibility. flexible≈120, around≈60, exactly/sharp≈15. Default 60.
 - players: integer 1–4. Default 2.
 - holes: one of "any","9","18". Default "any".
+- market: one of ${JSON.stringify(MARKET_IDS)}. Default "montreal" unless Toronto/GTA/Ontario is clearly requested.
 - useTarget: boolean — true only if a budget/price preference was expressed (cheap, under $X, around $X).
 - targetPrice: integer 20–200 CAD per player. cheap≈45; "around $X"→X. Only meaningful when useTarget is true.
 - maxPrice: integer 20–250 CAD per player. "under $X"→X. Default 140.
@@ -66,6 +67,9 @@ function coerce(raw: Record<string, unknown>, today: string) {
     useTarget: Boolean(raw.useTarget),
     targetPrice: int(raw.targetPrice, 70, 20, 200),
     maxPrice: int(raw.maxPrice, 140, 20, 250),
+    market: (MARKET_IDS as readonly string[]).includes(raw.market as string)
+      ? (raw.market as string)
+      : "montreal",
     regions,
     publicOnly: Boolean(raw.publicOnly),
     sort: (SORTS as readonly string[]).includes(raw.sort as string)
@@ -140,7 +144,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: `You convert a golfer's plain-English request into a structured tee-time search for a Greater Montréal aggregator. Be literal: only set filters the user actually expressed; leave everything else at its default. Never invent a region or budget the user did not mention.\n\n${FIELD_SPEC}`,
+            content: `You convert a golfer's plain-English request into a structured tee-time search for a Montréal and Toronto golf aggregator. Be literal: only set filters the user actually expressed; leave everything else at its default. Never invent a region or budget the user did not mention.\n\n${FIELD_SPEC}`,
           },
           {
             role: "user",

@@ -3,8 +3,9 @@ import {
   fetchCourseTeeTimes,
   getChronogolfCourses,
 } from "./providers/chronogolf";
+import { fetchTeeTimeCourseTeeTimes } from "./providers/teetime";
 import { generateEstimatedTeeTimes } from "./providers/seed";
-import type { GolfCourse, SearchQuery, TeeTime, TeeTimeResult } from "./types";
+import type { GolfCourse, MarketId, SearchQuery, TeeTime, TeeTimeResult } from "./types";
 import { todayISO } from "./format";
 
 export function parseTimeToMinutes(time: string): number {
@@ -15,7 +16,8 @@ export function parseTimeToMinutes(time: string): number {
 /**
  * Deep link straight to the course's booking page, pre-set to the chosen date
  * and round length so the golfer lands on their exact tee-off ready to book.
- * The Chronogolf club SPA honours `?date=` and `?nb_holes=`.
+ * Chronogolf honours `?date=` and `?nb_holes=`. TeeTime honours `?date=`
+ * on club pages. Other providers keep their official handoff URL.
  */
 export function deepBookingUrl(
   course: GolfCourse,
@@ -25,6 +27,9 @@ export function deepBookingUrl(
   if (course.source === "chronogolf" && course.chronogolfSlug) {
     const nb = holes >= 18 ? 18 : holes;
     return `https://www.chronogolf.com/club/${course.chronogolfSlug}?date=${date}&nb_holes=${nb}`;
+  }
+  if (course.source === "teetime" && course.teeTimeSlug) {
+    return `https://tee-time.com/clubs/${course.teeTimeSlug}?date=${date}`;
   }
   return course.bookingUrl;
 }
@@ -41,19 +46,27 @@ const norm = (s: string) =>
  * The full course directory: live Chronogolf courses + curated non-Chronogolf
  * extras (extras dropped if a live course already covers the same name).
  */
-export async function getDirectory(): Promise<GolfCourse[]> {
-  const live = await getChronogolfCourses();
+export async function getDirectory(market: MarketId = "montreal"): Promise<GolfCourse[]> {
+  const live = await getChronogolfCourses(market);
   const liveNames = new Set(live.map((c) => norm(c.name)));
-  const curatedByName = new Map(EXTRA_COURSES.map((c) => [norm(c.name), c]));
+  const marketExtras = EXTRA_COURSES.filter((course) => course.market === market);
+  const curatedByName = new Map(marketExtras.map((c) => [norm(c.name), c]));
+  const usedCurated = new Set<string>();
   const directory = live.map((course) => {
     const curated = curatedByName.get(norm(course.name));
+    if (curated?.source === "teetime") {
+      usedCurated.add(norm(course.name));
+      return curated;
+    }
     // Directory-only Chronogolf entries must not hide a verified booking portal.
     if (!course.online && curated) return {
       ...curated, id: course.id, photo: course.photo ?? curated.photo,
     };
     return course;
   });
-  const extras = EXTRA_COURSES.filter((e) => !liveNames.has(norm(e.name)));
+  const extras = marketExtras.filter(
+    (e) => !liveNames.has(norm(e.name)) && !usedCurated.has(norm(e.name)),
+  );
   return [...directory, ...extras].sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
@@ -105,6 +118,13 @@ async function gatherTeeTimes(
     if (course.online && course.chronogolfUuid) {
       try {
         live = await fetchCourseTeeTimes(course, date);
+      } catch {
+        live = null;
+      }
+    }
+    if (course.online && course.teeTimeSlug) {
+      try {
+        live = await fetchTeeTimeCourseTeeTimes(course, date);
       } catch {
         live = null;
       }
@@ -201,7 +221,7 @@ export interface SearchResponse {
 }
 
 export async function search(query: SearchQuery): Promise<SearchResponse> {
-  const directory = await getDirectory();
+  const directory = await getDirectory(query.market ?? "montreal");
   const byId = new Map(directory.map((c) => [c.id, c]));
   const candidates = preFilterCourses(directory, query);
   const teeTimes = await gatherTeeTimes(candidates, query.date);

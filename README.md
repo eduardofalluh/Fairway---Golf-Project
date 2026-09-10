@@ -1,27 +1,31 @@
-# Fairway — Montréal tee times
+# Fairway — Montréal and Toronto tee times
 
-A golf comparison app for Montréal and nearby Canadian courses. Search by date,
-time, players, round length, region and budget, compare green fees in CAD, and
-continue to the course's booking provider.
+A golf comparison app for Montréal, Toronto, and nearby Canadian courses. Search
+by market, date, time, players, round length, region, and budget, compare green
+fees in CAD, and continue to the course's booking provider.
 
 ## Current behavior
 
 - Cinematic course video with a pause control, reduced-motion support, and a
   photo fallback; responsive search and course cards.
-- The search UI starts with live Chronogolf availability plus clearly labeled
-  generated estimates so users see useful options right away. Users can switch
-  to live-only for provider-confirmed inventory. Estimates are not available
-  inventory or guaranteed prices, and cannot be booked within Fairway.
-- Official Chronogolf, MinuteGolf, and club-specific GGGolf account access open
-  on the provider's site. Fairway does not receive passwords, inspect those
-  browser sessions, or claim the accounts are linked. Users can mark a provider
-  as connected on their own device after signing in, which changes the account
-  card to a disabled connected state.
+- Montréal and Toronto/GTA are selectable markets. Each market has its own
+  regions, downtown-distance sorting, provider directory, and curated course
+  handoffs.
+- The search UI starts with live Chronogolf/TeeTime availability plus clearly
+  labeled generated estimates so users see useful options right away. Users can
+  switch to live-only for provider-confirmed inventory. Estimates are not
+  available inventory or guaranteed prices, and cannot be booked within Fairway.
+- Official Chronogolf, TeeTime, Golf the 6ix, GolfNow, MinuteGolf, and
+  club-specific GGGolf account access open on the provider's site. Fairway does
+  not receive passwords, inspect those browser sessions, or claim the accounts
+  are linked. Users can mark a provider as connected on their own device after
+  signing in, which changes the account card to a disabled connected state.
 - Connected providers unlock direct `Book with {Provider}` actions on matching
-  tee-time cards. Chronogolf and MinuteGolf connections apply provider-wide;
-  GGGolf connections apply to the selected club portal. The provider still
-  confirms availability, final price, payment, and the reservation. Fairway does
-  not make reservations or payments; `/api/autobook` returns HTTP 501.
+  tee-time cards. Chronogolf, TeeTime, Golf the 6ix, GolfNow, and MinuteGolf
+  connections apply provider-wide; GGGolf connections apply to the selected club
+  portal. The provider still confirms availability, final price, payment, and
+  the reservation. Fairway does not make reservations or payments;
+  `/api/autobook` returns HTTP 501.
 - Optional email is a selected-round reminder, never a booking confirmation.
   The UI only reports delivery if the email service accepts it.
 
@@ -57,33 +61,45 @@ production secrets in Netlify instead of committing local `.env*` files.
 
 ## Data and configuration
 
-`src/lib/providers/chronogolf.ts` reads public marketplace endpoints (unofficial,
-not a supported partner integration). Calls have timeouts, the directory is
-cached, and failures do not fabricate live availability. Canadian listings only;
-demo/test accounts are excluded. Prices retain cents, unknown capacity is not
-assumed available, and past tee times are excluded in the Montréal time zone.
+`src/lib/providers/chronogolf.ts` reads public marketplace endpoints around the
+selected market (unofficial, not a supported partner integration). Calls have
+timeouts, the directory is cached per market, and failures do not fabricate live
+availability. Canadian listings only; demo/test accounts are excluded. Prices
+retain cents, unknown capacity is not assumed available, and past tee times are
+excluded in the Eastern time zone.
 
-Curated courses in `src/lib/courses.ts` include verified official booking portals.
-Where a directory-only Chronogolf listing matches a curated course, the verified
-portal takes precedence. Distance is approximate, measured from downtown.
+`src/lib/providers/teetime.ts` reads public TeeTime club pages for selected GTA
+clubs whose server-rendered page contains availability data. Failures fall back
+to labeled estimates instead of presenting fake live inventory.
+
+Curated courses in `src/lib/courses.ts` include verified official booking portals
+for Montréal and Toronto/GTA. Where a directory-only live-provider listing
+matches a curated course, the verified portal takes precedence. Distance is
+approximate, measured from the selected market center.
 
 Useful environment settings:
 
-- `CHRONOGOLF_OFF=1`: disable live calls for offline development.
-- `CHRONOGOLF_RADIUS_KM=100`: directory search radius.
+- `CHRONOGOLF_OFF=1`: disable live Chronogolf calls for offline development.
+- `TEETIME_OFF=1`: disable live TeeTime calls for offline development.
+- `CHRONOGOLF_RADIUS_KM=100`: fallback directory search radius.
+- `CHRONOGOLF_MONTREAL_RADIUS_KM=100`: Montréal-specific directory radius.
+- `CHRONOGOLF_TORONTO_RADIUS_KM=100`: Toronto-specific directory radius.
 - `RESEND_API_KEY`, `BOOKING_FROM_EMAIL`: optional email reminder delivery.
 
 The retained natural-language search endpoint is not exposed in the refreshed
 interface because it requires a separately configured AI service. No paid
-provider, email or AI credentials are included in this deployment.
+provider, email, or AI credentials are included in this deployment.
 
 ## Search API
 
-`GET /api/tee-times?date=2026-09-12&time=13:00&window=60&players=2&holes=18&max=100&sort=price-asc&live=1`
+```text
+GET /api/tee-times?market=toronto&date=2026-09-12&time=13:00&window=60&players=2&holes=18&max=100&sort=price-asc&live=0
+```
 
-Returns `{ results, meta }`. Set `live=0` to explicitly include estimates.
-Invalid dates, times, player counts, region names, sorting and price ranges
-return HTTP 400 before provider calls.
+Returns `{ results, meta }`. Set `market=montreal` or `market=toronto`; omitted
+market defaults to Montréal. Set `live=0` to explicitly include estimates.
+Invalid dates, times, player counts, market names, region names, sorting and
+price ranges return HTTP 400 before provider calls.
 
-All prices and availability must be confirmed by the booking provider. Fairway
-is independent of GGGolf, MinuteGolf and Chronogolf.
+All prices and availability must be confirmed by the booking provider. Fairway is
+independent of every listed provider.

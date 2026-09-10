@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { ArrowDownRight, KeyRound, Pause, Play } from "lucide-react";
 
-export function Hero({ courseCount }: { courseCount: number }) {
+export function Hero({
+  courseCount,
+  marketCount = 2,
+}: {
+  courseCount: number;
+  marketCount?: number;
+}) {
   const sectionRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const reduceMotion = useReducedMotion();
@@ -45,7 +51,7 @@ export function Hero({ courseCount }: { courseCount: number }) {
         <div className="max-w-3xl text-white">
           <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }} className="mb-6 flex flex-wrap items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-white/78">
             <span className="h-px w-8 bg-lime" />
-            Greater Montréal · {courseCount} courses tracked
+            Montréal + Toronto · {marketCount} markets · {courseCount} courses tracked
           </motion.p>
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="font-display text-[clamp(3.25rem,7vw,6.35rem)] font-semibold leading-[0.95] tracking-[-0.045em]">
             Find your round.

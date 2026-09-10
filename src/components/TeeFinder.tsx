@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
-import type { Region, TeeTimeResult } from "@/lib/types";
+import type { MarketId, Region, TeeTimeResult } from "@/lib/types";
 import type { SearchResponse } from "@/lib/aggregator";
-import { REGIONS } from "@/lib/types";
+import { MARKET_REGIONS } from "@/lib/types";
+import { MARKETS } from "@/lib/markets";
 import {
   formatPrice,
   formatTime12,
@@ -42,6 +43,7 @@ type SortKey =
 /** The full set of search inputs — used to override form state for AI search. */
 type SearchValues = {
   date: string;
+  market: MarketId;
   time: string;
   windowMinutes: number;
   players: number;
@@ -79,6 +81,7 @@ function defaultSearchDate() {
 
 export function TeeFinder() {
   const [date, setDate] = useState(defaultSearchDate);
+  const [market, setMarket] = useState<MarketId>("montreal");
   const [time, setTime] = useState("13:00");
   const [windowMinutes, setWindowMinutes] = useState(60);
   const [players, setPlayers] = useState(2);
@@ -101,6 +104,8 @@ export function TeeFinder() {
   const { profile, save, clear } = useProfile();
   const { isConnected: isProviderConnected } = useProviderConnections();
   const [bookingTee, setBookingTee] = useState<TeeTimeResult | null>(null);
+  const marketConfig = MARKETS[market];
+  const regionOptions = MARKET_REGIONS[market];
 
   // Location + view
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -137,6 +142,7 @@ export function TeeFinder() {
       setError(null);
       const v = {
         date: ov?.date ?? date,
+        market: ov?.market ?? market,
         time: ov?.time ?? time,
         windowMinutes: ov?.windowMinutes ?? windowMinutes,
         players: ov?.players ?? players,
@@ -151,6 +157,7 @@ export function TeeFinder() {
       };
       const params = new URLSearchParams({
         date: v.date,
+        market: v.market,
         time: v.time,
         window: String(v.windowMinutes),
         players: String(v.players),
@@ -184,7 +191,7 @@ export function TeeFinder() {
         if (requestRef.current === controller) setLoading(false);
       }
     },
-    [date, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, liveOnly, sort],
+    [date, market, time, windowMinutes, players, holes, useTarget, targetPrice, maxPrice, regions, publicOnly, liveOnly, sort],
   );
 
   // initial load so the page is never empty
@@ -203,6 +210,13 @@ export function TeeFinder() {
 
   const toggleRegion = (r: Region) =>
     setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
+
+  const chooseMarket = (nextMarket: MarketId) => {
+    if (nextMarket === market) return;
+    setMarket(nextMarket);
+    setRegions([]);
+    runSearch(true, { market: nextMarket, regions: [] });
+  };
 
   // Results ordered by distance from the user when we know where they are and
   // they picked "Nearest to me" — otherwise the server order.
@@ -248,7 +262,7 @@ export function TeeFinder() {
   return (
     <section id="search" className="relative mx-auto max-w-[1440px] scroll-mt-20 px-5 py-16 sm:px-8 lg:px-10 lg:py-20">
       <div className="mb-9 grid gap-5 lg:grid-cols-[.7fr_1.3fr] lg:items-end">
-        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Search Greater Montréal</p>
+        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">Search {marketConfig.areaLabel}</p>
         <div>
           <h2 className="font-display text-5xl font-semibold leading-[.9] tracking-[-.035em] sm:text-6xl">Your time. Your price.<br />Every fairway.</h2>
           <p className="mt-4 max-w-xl text-sm leading-6 text-fog">Compare every useful option first. Provider-confirmed slots appear live, and estimates stay clearly labeled.</p>
@@ -257,6 +271,28 @@ export function TeeFinder() {
 
       {/* ── Search panel ───────────────────────────────────────────── */}
       <div className="rounded-[2rem] border border-line bg-surface p-5 shadow-[0_24px_80px_rgba(34,55,44,.08)] sm:p-8 lg:p-10">
+        <div className="mb-5 grid gap-3 sm:grid-cols-2">
+          {(["montreal", "toronto"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => chooseMarket(id)}
+              aria-pressed={market === id}
+              className={`rounded-2xl border px-5 py-4 text-left transition ${
+                market === id
+                  ? "border-forest bg-forest text-white shadow-[0_14px_30px_rgba(10,52,34,0.16)]"
+                  : "border-line bg-base-2 text-fog hover:border-forest hover:text-cream"
+              }`}
+            >
+              <span className="text-[10px] font-bold uppercase tracking-[.22em] opacity-70">
+                {MARKETS[id].shortLabel}
+              </span>
+              <span className="mt-1 block font-display text-2xl font-semibold">
+                {MARKETS[id].areaLabel}
+              </span>
+            </button>
+          ))}
+        </div>
         <div className="mb-8 flex flex-col gap-3 rounded-2xl bg-base px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-cream">Availability quality</p>
@@ -440,7 +476,7 @@ export function TeeFinder() {
             <Chip active={regions.length === 0} onClick={() => setRegions([])}>
               All regions
             </Chip>
-            {REGIONS.map((r) => (
+            {regionOptions.map((r) => (
               <Chip key={r} active={regions.includes(r)} onClick={() => toggleRegion(r)}>
                 {r}
               </Chip>
@@ -507,7 +543,7 @@ export function TeeFinder() {
                   )}
                   {data.meta.total === 0
                     ? "No results match this search. Availability can change; check again or adjust your filters."
-                    : `${data.meta.liveRows} live from Chronogolf${data.meta.total > data.meta.liveRows ? ` · ${data.meta.total - data.meta.liveRows} generated estimates` : ""}`}
+                    : `${data.meta.liveRows} live provider ${data.meta.liveRows === 1 ? "slot" : "slots"}${data.meta.total > data.meta.liveRows ? ` · ${data.meta.total - data.meta.liveRows} generated estimates` : ""}`}
                 </p>
               </div>
 

@@ -1,5 +1,13 @@
 export type BookingProviderId =
   | "chronogolf"
+  | "teetime"
+  | "golfthe6ix"
+  | "golfnow"
+  | "ezlinks"
+  | "teeitup"
+  | "linkline"
+  | "jonas"
+  | "clublink"
   | "minutegolf"
   | "gggolf"
   | "course";
@@ -28,6 +36,70 @@ export const BOOKING_PROVIDERS: Record<
     connectedAccount: false,
     directBooking: false,
     contextualHandoff: true,
+  },
+  teetime: {
+    id: "teetime",
+    name: "TeeTime",
+    accountAccess: "central",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: true,
+  },
+  golfthe6ix: {
+    id: "golfthe6ix",
+    name: "Golf the 6ix",
+    accountAccess: "central",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: false,
+  },
+  golfnow: {
+    id: "golfnow",
+    name: "GolfNow",
+    accountAccess: "central",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: false,
+  },
+  ezlinks: {
+    id: "ezlinks",
+    name: "EZLinks",
+    accountAccess: "central",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: false,
+  },
+  teeitup: {
+    id: "teeitup",
+    name: "TeeItUp",
+    accountAccess: "central",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: false,
+  },
+  linkline: {
+    id: "linkline",
+    name: "LinkLine",
+    accountAccess: "unknown",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: false,
+  },
+  jonas: {
+    id: "jonas",
+    name: "Jonas",
+    accountAccess: "unknown",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: false,
+  },
+  clublink: {
+    id: "clublink",
+    name: "ClubLink",
+    accountAccess: "central",
+    connectedAccount: false,
+    directBooking: false,
+    contextualHandoff: false,
   },
   minutegolf: {
     id: "minutegolf",
@@ -63,6 +135,30 @@ export const PROVIDER_ACCOUNT_LINKS = [
     action: "Sign in on Chronogolf",
     description:
       "Live tee times come from Chronogolf when its course sheet is open. Sign in there before you finish booking.",
+  },
+  {
+    id: "teetime" as const,
+    name: "TeeTime",
+    href: "https://tee-time.com/login",
+    action: "Sign in on TeeTime",
+    description:
+      "Toronto live tee times can come from TeeTime clubs. Sign in there before you finish booking.",
+  },
+  {
+    id: "golfthe6ix" as const,
+    name: "Golf the 6ix",
+    href: "https://app.golfthe6ix.com/",
+    action: "Open Golf the 6ix",
+    description:
+      "City of Toronto courses use Golf the 6ix for provider-hosted booking.",
+  },
+  {
+    id: "golfnow" as const,
+    name: "GolfNow",
+    href: "https://www.golfnow.com/login",
+    action: "Sign in on GolfNow",
+    description:
+      "GolfNow is useful for Toronto-area provider handoffs where clubs use its booking network.",
   },
   {
     id: "minutegolf" as const,
@@ -112,6 +208,30 @@ export function getBookingProvider(bookingUrl: string): BookingProviderConfig {
     }
     if (hostname === "chronogolf.com" || hostname.endsWith(".chronogolf.com")) {
       return BOOKING_PROVIDERS.chronogolf;
+    }
+    if (hostname === "tee-time.com" || hostname.endsWith(".tee-time.com")) {
+      return BOOKING_PROVIDERS.teetime;
+    }
+    if (hostname === "app.golfthe6ix.com" || hostname.endsWith(".golfthe6ix.com")) {
+      return BOOKING_PROVIDERS.golfthe6ix;
+    }
+    if (hostname === "golfnow.com" || hostname.endsWith(".golfnow.com")) {
+      return BOOKING_PROVIDERS.golfnow;
+    }
+    if (hostname === "ezlinksgolf.com" || hostname.endsWith(".ezlinksgolf.com")) {
+      return BOOKING_PROVIDERS.ezlinks;
+    }
+    if (hostname === "teeitup.golf" || hostname.endsWith(".teeitup.golf")) {
+      return BOOKING_PROVIDERS.teeitup;
+    }
+    if (hostname === "linklineonline.ca" || hostname.endsWith(".linklineonline.ca")) {
+      return BOOKING_PROVIDERS.linkline;
+    }
+    if (hostname.includes("clubhouseonline")) {
+      return BOOKING_PROVIDERS.jonas;
+    }
+    if (hostname === "clublink.ca" || hostname.endsWith(".clublink.ca")) {
+      return BOOKING_PROVIDERS.clublink;
     }
   } catch {
     // The URL is rendered as an unavailable handoff by `safeBookingUrl` below.

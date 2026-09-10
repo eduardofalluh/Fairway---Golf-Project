@@ -1,5 +1,7 @@
 import type { GolfCourse, TeeTime } from "../types";
-import { classifyRegion, distanceFromDowntown, DOWNTOWN } from "../geo";
+import { classifyRegion, distanceFromMarket } from "../geo";
+import { getMarket } from "../markets";
+import type { MarketId } from "../types";
 
 /**
  * Live Chronogolf (Lightspeed Golf) integration.
@@ -33,8 +35,6 @@ const HEADERS = { Accept: "application/json", "User-Agent": UA };
 
 /** Disable all live Chronogolf calls (e.g. offline dev) with CHRONOGOLF_OFF=1. */
 const DISABLED = process.env.CHRONOGOLF_OFF === "1";
-/** Radius (km) of the directory pull around downtown Montréal. */
-const RADIUS_KM = Number(process.env.CHRONOGOLF_RADIUS_KM ?? 100);
 
 interface SearchCourse {
   uuid: string;
@@ -91,7 +91,12 @@ function bookingUrl(slug: string) {
   return `https://www.chronogolf.com/club/${slug}`;
 }
 
-function toCourse(c: SearchCourse): GolfCourse | null {
+function radiusForMarket(market: MarketId) {
+  const envKey = `CHRONOGOLF_${market.toUpperCase()}_RADIUS_KM`;
+  return Number(process.env[envKey] ?? process.env.CHRONOGOLF_RADIUS_KM ?? getMarket(market).defaultRadiusKm);
+}
+
+function toCourse(market: MarketId, c: SearchCourse): GolfCourse | null {
   if (!c.uuid || !c.location) return null;
   // The radius crosses the US border; advertised fees here are CAD only.
   if (c.country !== "Canada") return null;
@@ -103,11 +108,12 @@ function toCourse(c: SearchCourse): GolfCourse | null {
   );
   return {
     id: c.uuid,
+    market,
     name: c.name,
     city,
-    region: classifyRegion(city, lat, lon),
+    region: classifyRegion(market, city, lat, lon),
     holes,
-    distanceKm: distanceFromDowntown(lat, lon),
+    distanceKm: distanceFromMarket(market, lat, lon),
     lat,
     lng: lon,
     source: "chronogolf",
@@ -124,31 +130,34 @@ function toCourse(c: SearchCourse): GolfCourse | null {
   };
 }
 
-let directoryCache: { at: number; courses: GolfCourse[] } | null = null;
+const directoryCache = new Map<MarketId, { at: number; courses: GolfCourse[] }>();
 const DIRECTORY_TTL_MS = 6 * 60 * 60 * 1000;
 
 /**
  * Pull the live Chronogolf course directory around Montréal. Cached in-process
  * for 6h (and at the fetch layer). Returns [] if Chronogolf is unreachable.
  */
-export async function getChronogolfCourses(): Promise<GolfCourse[]> {
+export async function getChronogolfCourses(market: MarketId = "montreal"): Promise<GolfCourse[]> {
   if (DISABLED) return [];
   // We can't call Date.now()-free here in app runtime; this is fine in Next.
   const now = Date.now();
-  if (directoryCache && now - directoryCache.at < DIRECTORY_TTL_MS) {
-    return directoryCache.courses;
+  const cached = directoryCache.get(market);
+  if (cached && now - cached.at < DIRECTORY_TTL_MS) {
+    return cached.courses;
   }
 
   const courses: GolfCourse[] = [];
+  const marketConfig = getMarket(market);
+  const radiusKm = radiusForMarket(market);
   for (let page = 1; page <= 6; page++) {
     const url =
-      `${BASE}/search?location[lat]=${DOWNTOWN.lat}` +
-      `&location[lon]=${DOWNTOWN.lng}&location[distance]=${RADIUS_KM}` +
+      `${BASE}/search?location[lat]=${marketConfig.center.lat}` +
+      `&location[lon]=${marketConfig.center.lng}&location[distance]=${radiusKm}` +
       `&published=true&page=${page}`;
     const batch = await getJson<SearchCourse[]>(url, 21600);
     if (!batch || batch.length === 0) break;
     for (const c of batch) {
-      const mapped = toCourse(c);
+      const mapped = toCourse(market, c);
       if (mapped) courses.push(mapped);
     }
     if (batch.length < 25) break;
@@ -156,14 +165,14 @@ export async function getChronogolfCourses(): Promise<GolfCourse[]> {
 
   if (courses.length === 0) {
     // keep any previous good cache rather than wiping it
-    return directoryCache?.courses ?? [];
+    return cached?.courses ?? [];
   }
 
   // de-dupe by uuid
   const seen = new Map<string, GolfCourse>();
   for (const c of courses) if (!seen.has(c.id)) seen.set(c.id, c);
   const list = [...seen.values()];
-  directoryCache = { at: now, courses: list };
+  directoryCache.set(market, { at: now, courses: list });
   return list;
 }
 
@@ -287,4 +296,11 @@ export function parseTeetimesResponse(
   return out;
 }
 
-export const liveStatus = { disabled: DISABLED, radiusKm: RADIUS_KM, base: BASE };
+export const liveStatus = {
+  disabled: DISABLED,
+  radiusKm: {
+    montreal: radiusForMarket("montreal"),
+    toronto: radiusForMarket("toronto"),
+  },
+  base: BASE,
+};

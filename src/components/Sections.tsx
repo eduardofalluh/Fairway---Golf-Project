@@ -51,7 +51,7 @@ export function CtaBand() {
 
 const FAQS = [
   { q: "Are all results live?", a: "The search starts with live slots plus clearly marked estimates so you can compare options right away. Use the live-only filter when you want provider-confirmed inventory only." },
-  { q: "Where does availability come from?", a: "Chronogolf availability can appear live when its tee sheet is reachable. Other listed provider and course options are shown as clearly marked estimates until you verify them on the booking page." },
+  { q: "Where does availability come from?", a: "Chronogolf and TeeTime availability can appear live when their tee sheets are reachable. Other listed provider and course options are shown as clearly marked estimates until you verify them on the booking page." },
   { q: "How does the time window work?", a: "Choose your ideal tee time and up to three hours of flexibility in either direction. Fairway returns matching slots and lets you sort the list your way." },
   { q: "Does Fairway complete the payment?", a: "You review the final details, sign in on the provider page, and complete payment there. The provider sends the booking confirmation." },
 ];
@@ -103,7 +103,7 @@ export function Footer() {
   return (
     <footer className="bg-forest text-white">
       <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-12 sm:px-8 md:grid-cols-3 md:items-end lg:px-10">
-        <div><div className="flex items-center gap-2.5 font-display text-2xl font-semibold"><span className="grid h-8 w-8 place-items-center rounded-full bg-lime text-forest"><Flag size={15} fill="currentColor" /></span>Fairway</div><p className="mt-3 max-w-xs text-sm leading-6 text-white/55">One place to discover and compare golf around Greater Montréal.</p></div>
+        <div><div className="flex items-center gap-2.5 font-display text-2xl font-semibold"><span className="grid h-8 w-8 place-items-center rounded-full bg-lime text-forest"><Flag size={15} fill="currentColor" /></span>Fairway</div><p className="mt-3 max-w-xs text-sm leading-6 text-white/55">One place to discover and compare golf around Montréal and Toronto.</p></div>
         <div className="flex gap-6 text-xs font-semibold uppercase tracking-[.14em] text-white/65 md:justify-center"><a href="#search" className="hover:text-lime">Search</a><a href="#accounts" className="hover:text-lime">Accounts</a><a href="#faq" className="hover:text-lime">FAQ</a></div>
         <p className="text-xs text-white/45 md:text-right">© {new Date().getFullYear()} Fairway · Confirm final details with the provider.</p>
       </div>
