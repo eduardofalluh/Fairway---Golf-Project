@@ -112,6 +112,11 @@ type Copy = {
     liveNow: string;
     sortNearest: string;
     noMatches: () => string;
+    courseFallbackHeading: (count: number) => string;
+    courseFallbackBody: string;
+    courseFallbackCardNote: string;
+    providerHandoffBadge: string;
+    openProvider: (provider: string) => string;
     mapCaption: (count: number, hasUser: boolean) => string;
     liveLegend: string;
     showingTop: (shown: number, total: number) => string;
@@ -340,6 +345,12 @@ export const copy: Record<Language, Copy> = {
       sortNearest: "Sort by nearest →",
       noMatches: () =>
         "No provider-confirmed tee times match those filters. Try another time, region, or budget.",
+      courseFallbackHeading: (count) => `${count} supported ${count === 1 ? "course" : "courses"}`,
+      courseFallbackBody:
+        "Live tee times are not reachable from this host right now, so Fairway is showing course/provider handoffs without prices or tee times.",
+      courseFallbackCardNote: "No live tee time or price is shown until the provider confirms inventory.",
+      providerHandoffBadge: "Provider handoff",
+      openProvider: (provider) => `Open ${provider} ↗`,
       mapCaption: (count, hasUser) =>
         `${count} courses · ${hasUser ? "blue dot is you" : "tap “Use my location” to measure distance"}. Tap a dot for times & booking.`,
       liveLegend: "● live",
@@ -593,6 +604,12 @@ export const copy: Record<Language, Copy> = {
       sortNearest: "Trier par proximité →",
       noMatches: () =>
         "Aucun départ confirmé par un fournisseur ne correspond à ces filtres. Essayez une autre heure, région ou budget.",
+      courseFallbackHeading: (count) => `${count} parcours compatibles`,
+      courseFallbackBody:
+        "Les départs en direct ne sont pas accessibles depuis cet hébergeur pour le moment; Fairway affiche donc les liens officiels des parcours sans prix ni heure de départ.",
+      courseFallbackCardNote: "Aucun prix ni départ n’est affiché tant que le fournisseur ne confirme pas l’inventaire.",
+      providerHandoffBadge: "Lien fournisseur",
+      openProvider: (provider) => `Ouvrir ${provider} ↗`,
       mapCaption: (count, hasUser) =>
         `${count} parcours · ${hasUser ? "le point bleu, c’est vous" : "touchez « Utiliser ma position » pour mesurer la distance"}. Touchez un point pour voir les heures et réserver.`,
       liveLegend: "● direct",

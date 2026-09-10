@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
-import type { MarketId, Region, TeeTimeResult } from "@/lib/types";
+import type { GolfCourse, MarketId, Region, TeeTimeResult } from "@/lib/types";
 import type { SearchResponse } from "@/lib/aggregator";
 import { MARKET_REGIONS } from "@/lib/types";
 import { MARKETS } from "@/lib/markets";
@@ -548,7 +548,9 @@ export function TeeFinder() {
             <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h3 className="font-display text-2xl font-bold">
-                  {t.search.resultHeading(data.meta.total, data.meta.courses)}
+                  {data.results.length === 0 && data.fallbackCourses.length > 0
+                    ? t.search.courseFallbackHeading(data.fallbackCourses.length)
+                    : t.search.resultHeading(data.meta.total, data.meta.courses)}
                 </h3>
                 <p className="mt-1 text-sm text-fog">
                   {data.meta.cheapest != null && (
@@ -559,7 +561,9 @@ export function TeeFinder() {
                     </>
                   )}
                   {data.meta.total === 0
-                    ? t.search.noResultsMeta
+                    ? data.fallbackCourses.length > 0
+                      ? t.search.courseFallbackBody
+                      : t.search.noResultsMeta
                     : t.search.resultSummary(data.meta.liveRows, data.meta.total)}
                 </p>
               </div>
@@ -648,10 +652,17 @@ export function TeeFinder() {
               </button>
             )}
 
-            {data.results.length === 0 && !error && (
+            {data.results.length === 0 && !error && data.fallbackCourses.length === 0 && (
               <div className="rounded-2xl border border-line bg-surface p-10 text-center text-fog">
                 <p>{t.search.noMatches()}</p>
               </div>
+            )}
+
+            {data.results.length === 0 && data.fallbackCourses.length > 0 && (
+              <CourseFallbackGrid
+                courses={data.fallbackCourses}
+                userLoc={userLoc}
+              />
             )}
 
             {view === "map" && data.results.length > 0 ? (
@@ -749,6 +760,83 @@ function Chip({
     >
       {children}
     </button>
+  );
+}
+
+function CourseFallbackGrid({
+  courses,
+  userLoc,
+}: {
+  courses: GolfCourse[];
+  userLoc: { lat: number; lng: number } | null;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3">
+      {courses.map((course, index) => (
+        <motion.div
+          key={course.id}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: Math.min(index * 0.015, 0.35) }}
+        >
+          <CourseFallbackCard course={course} userLoc={userLoc} />
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function CourseFallbackCard({
+  course,
+  userLoc,
+}: {
+  course: GolfCourse;
+  userLoc: { lat: number; lng: number } | null;
+}) {
+  const { t } = useLanguage();
+  const provider = getBookingProvider(course.bookingUrl);
+  const handoffUrl = safeBookingUrl(course.bookingUrl);
+  const fromYouKm =
+    userLoc && typeof course.lat === "number"
+      ? haversineKm(userLoc.lat, userLoc.lng, course.lat, course.lng)
+      : null;
+  return (
+    <div className="group flex flex-col gap-4 rounded-2xl border border-line bg-surface/80 p-5 transition hover:border-forest/40 hover:bg-surface sm:flex-row sm:items-center">
+      <div className="flex min-w-0 w-full items-center gap-4 sm:flex-1">
+        <div className="relative h-[74px] w-[92px] shrink-0 overflow-hidden rounded-xl bg-base-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={course.photo ?? "/hero.jpg"} alt="" loading="lazy" onError={(event) => { event.currentTarget.src = "/hero.jpg"; }} className="h-full w-full object-cover" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="truncate font-display text-base font-semibold leading-tight text-cream">
+              {course.name}
+            </h4>
+            <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog">
+              {t.search.providerHandoffBadge}
+            </span>
+          </div>
+          <p className="mt-1 line-clamp-2 text-sm leading-5 text-fog sm:truncate">
+            {course.city} · {course.region} · {fromYouKm != null ? t.search.distanceFromYou(fromYouKm, driveMinutes(fromYouKm)) : `${course.distanceKm} km`} · {course.holes.map((h) => t.search.holesValue(h)).join(" / ")}
+          </p>
+          <p className="mt-1 text-xs text-fog">{t.search.courseFallbackCardNote}</p>
+        </div>
+      </div>
+      {handoffUrl ? (
+        <a
+          href={handoffUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 rounded-xl bg-forest px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-forest-soft sm:px-5"
+        >
+          {t.search.openProvider(provider.name)}
+        </a>
+      ) : (
+        <span className="shrink-0 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-fog sm:px-5">
+          {t.search.unavailable}
+        </span>
+      )}
+    </div>
   );
 }
 

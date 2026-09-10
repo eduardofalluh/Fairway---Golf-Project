@@ -207,6 +207,7 @@ function sortResults(results: TeeTimeResult[], query: SearchQuery): TeeTimeResul
 
 export interface SearchResponse {
   results: TeeTimeResult[];
+  fallbackCourses: GolfCourse[];
   meta: {
     total: number;
     courses: number;
@@ -225,6 +226,9 @@ export async function search(query: SearchQuery): Promise<SearchResponse> {
   const candidates = preFilterCourses(directory, query);
   const teeTimes = await gatherTeeTimes(candidates, query.date);
   const results = applySearch(teeTimes, byId, query);
+  const fallbackCourses = results.length === 0
+    ? candidates.filter((course) => course.online || course.bookingUrl).slice(0, 60)
+    : [];
 
   const prices = results.map((r) => r.price);
   const liveCourseIds = new Set(
@@ -233,6 +237,7 @@ export async function search(query: SearchQuery): Promise<SearchResponse> {
 
   return {
     results,
+    fallbackCourses,
     meta: {
       total: results.length,
       courses: new Set(results.map((r) => r.courseId)).size,
