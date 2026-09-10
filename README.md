@@ -50,6 +50,10 @@ Sites hosting uses `.openai/hosting.json`, `vite.config.mts`, and the build outp
 in `dist/`. Local `.env*` files are ignored and are never published as source.
 Configure production secrets in the hosting environment.
 
+Netlify hosting uses `netlify.toml`, builds with `npm run build:next`, and
+publishes the `.next` output through Netlify's managed Next.js runtime. Configure
+production secrets in Netlify instead of committing local `.env*` files.
+
 ## Data and configuration
 
 `src/lib/providers/chronogolf.ts` reads public marketplace endpoints (unofficial,
