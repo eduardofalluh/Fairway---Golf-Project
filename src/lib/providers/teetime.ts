@@ -79,7 +79,7 @@ async function fetchPage(slug: string, date: string): Promise<TeeTimePage | null
     const res = await fetch(`${BASE}/clubs/${slug}?date=${date}`, {
       headers: HEADERS,
       signal: controller.signal,
-      next: { revalidate: 120 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const html = await res.text();
@@ -109,12 +109,12 @@ export async function fetchTeeTimeCourseTeeTimes(
     for (const entry of entries) {
       const parsed = parseTime(entry.time ?? bucketKey);
       if (!parsed) continue;
-      if (entry.date && !String(entry.date).startsWith(date)) continue;
-      const price = asPositiveNumber(entry.price ?? bucket.priceFrom);
+      if (typeof entry.date !== "string" || !entry.date.startsWith(date)) continue;
+      const price = asPositiveNumber(entry.price);
       if (price == null) continue;
-      const groupSize = asPositiveNumber(entry.group_size ?? bucket.group_size);
+      const groupSize = asPositiveNumber(entry.group_size);
       if (groupSize == null) continue;
-      const holes = Number(entry.holes ?? bucket.holes);
+      const holes = Number(entry.holes);
       if (holes !== 9 && holes !== 18) continue;
       rows.push({
         id: `${course.id}-${date}-teetime-${holes}-${parsed.minutes}-${entry.id ?? bucketKey}`,

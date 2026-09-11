@@ -42,6 +42,29 @@ function isCourse(value: BookingPayload["courseData"]): value is GolfCourse {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const EMAIL_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_LIMIT = 5;
+const emailAttempts = new Map<string, number[]>();
+
+function clientKey(request: Request, email: string) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const ip = forwarded || request.headers.get("x-real-ip") || "unknown";
+  return `${ip.slice(0, 64)}:${email.toLowerCase()}`;
+}
+
+function emailRateLimited(request: Request, email: string) {
+  const key = clientKey(request, email);
+  const now = Date.now();
+  const recent = (emailAttempts.get(key) ?? []).filter((at) => now - at < EMAIL_WINDOW_MS);
+  if (recent.length >= EMAIL_LIMIT) {
+    emailAttempts.set(key, recent);
+    return true;
+  }
+  recent.push(now);
+  emailAttempts.set(key, recent);
+  return false;
+}
+
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
@@ -152,6 +175,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
   }
 
+  if (emailRateLimited(request, email)) {
+    return NextResponse.json(
+      { error: "Too many email requests. Please try again later." },
+      { status: 429 },
+    );
+  }
+
   const verification = await verifyLiveTeeTime({
     date: body.date,
     time: body.time,
@@ -169,6 +199,9 @@ export async function POST(request: Request) {
     );
   }
 
+  body.course = body.courseData.name;
+  body.city = body.courseData.city;
+  body.price = verification.price;
   body.bookingUrl = verification.bookingUrl;
   const html = confirmationHtml(body);
   const result = await deliver(email, html, body).catch(() => ({ delivered: false }));

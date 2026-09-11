@@ -49,7 +49,7 @@ test('email delivery failure returns honest failure and never claims reservation
   globalThis.fetch=(async(input)=>{
     const url=String(input);
     if(url.includes('/marketplace/v2/clubs/golf-sainte-rose')) return Response.json({courses:[{uuid:'course-st-rose',holes:18}]});
-    if(url.includes('/marketplace/v2/teetimes?')) return Response.json({status:'open',teetimes:[{start_time:'06:30',date:'2099-07-10',max_player_size:4,default_price:{green_fee:72,bookable_holes:18}}]});
+    if(url.includes('/marketplace/v2/teetimes?')) return Response.json({status:'open',teetimes:[{start_time:'06:30',date:'2099-07-10',max_player_size:4,course:{uuid:'course-st-rose',holes:18},default_price:{green_fee:72,bookable_holes:18}}]});
     if(url.includes('api.resend.com')) throw new Error('simulated email outage');
     throw new Error(`Unexpected fetch: ${url}`);
   }) as typeof fetch;
@@ -73,4 +73,31 @@ test('email endpoint stops when provider no longer has the selected slot',async(
     const json=await response.json();
     assert.equal(json.delivered,false);
   } finally {globalThis.fetch=originalFetch;}
+});
+
+
+test('email endpoint rate-limits repeated reminder sends', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = 'test-only-key';
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url.includes('/marketplace/v2/clubs/golf-sainte-rose')) return Response.json({ courses: [{ uuid: 'course-st-rose', holes: 18 }] });
+    if (url.includes('/marketplace/v2/teetimes?')) return Response.json({ status: 'open', teetimes: [{ start_time: '06:30', date: '2099-07-10', max_player_size: 4, course: { uuid: 'course-st-rose', holes: 18 }, default_price: { green_fee: 72, bookable_holes: 18 } }] });
+    if (url.includes('api.resend.com')) return Response.json({ id: 'sent' });
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+  try {
+    const payload = { ...livePayload, email: 'rate-limit@example.com' };
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const response = await POST(request(payload));
+      statuses.push(response.status);
+    }
+    assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = originalKey;
+  }
 });

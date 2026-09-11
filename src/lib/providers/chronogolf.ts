@@ -57,12 +57,23 @@ interface Teetime {
   date?: string;
   has_cart?: boolean;
   max_player_size?: number;
+  frozen?: boolean;
+  disabled?: boolean;
+  available?: boolean;
+  bookable?: boolean;
+  format?: string | null;
   course?: { holes?: number; name?: string; uuid?: string };
   default_price?: {
     green_fee?: number | null;
     subtotal?: number | null;
     /** Round length this price/slot is bookable for (9 or 18). */
     bookable_holes?: number | null;
+    affiliation_type?: string | null;
+    name?: string | null;
+    label?: string | null;
+    title?: string | null;
+    category?: string | null;
+    type?: string | null;
   };
 }
 
@@ -252,7 +263,7 @@ export async function fetchCourseTeeTimes(
       120,
     );
     if (data?.status === "closed" || (data?.status === "open" && Array.isArray(data.teetimes))) receivedSheet = true;
-    const rows = parseTeetimesResponse(course, date, data);
+    const rows = parseTeetimesResponse(course, date, data, new Set(courseUuids));
     for (const row of rows) {
       const key = `${row.time}-${row.holes}`;
       if (seen.has(key)) continue;
@@ -270,6 +281,42 @@ interface TeetimesResponse {
   teetimes?: Teetime[];
 }
 
+function looksBookable(t: Teetime) {
+  if (t.frozen === true || t.disabled === true) return false;
+  if (t.available === false || t.bookable === false) return false;
+  if (typeof t.format === "string" && /block|closed|event|league|tournament/i.test(t.format)) {
+    return false;
+  }
+  return true;
+}
+
+function hasPublicPrice(price: Teetime["default_price"]) {
+  if (!price) return false;
+  const labels = [
+    price.affiliation_type,
+    price.name,
+    price.label,
+    price.title,
+    price.category,
+    price.type,
+  ]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
+
+  if (!labels) return true;
+  if (/sans carte/.test(labels)) {
+    return true;
+  }
+  if (/member|membre|membership|abonn|carte|priv[ée]e?/.test(labels)) {
+    return false;
+  }
+  if (/visitor|visiteur|public|regular|guest|green fee|daily fee|adulte/.test(labels)) {
+    return true;
+  }
+  return true;
+}
+
 /**
  * Pure parser: turn a Chronogolf `/teetimes` JSON response into our TeeTime
  * rows. Exported so it can be unit-tested against captured real payloads (live
@@ -279,19 +326,25 @@ export function parseTeetimesResponse(
   course: GolfCourse,
   date: string,
   data: TeetimesResponse | null,
+  allowedCourseUuids?: ReadonlySet<string>,
 ): TeeTime[] {
   if (!data || data.status !== "open" || !Array.isArray(data.teetimes)) return [];
   const out: TeeTime[] = [];
   for (const t of data.teetimes) {
+    if (!looksBookable(t) || !hasPublicPrice(t.default_price)) continue;
+    if (allowedCourseUuids) {
+      const upstreamCourseUuid = t.course?.uuid;
+      if (!upstreamCourseUuid || !allowedCourseUuids.has(upstreamCourseUuid)) continue;
+    }
+    if (t.date !== date) continue;
     const parsed = pad(t.start_time ?? "");
     if (!parsed) continue;
     const price = t.default_price?.green_fee ?? t.default_price?.subtotal;
     // Skip slots with no real public price ($0 = members/affiliation-only rate).
     if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) continue;
-    if (t.date && t.date !== date) continue;
     if (!Number.isInteger(t.max_player_size) || (t.max_player_size ?? 0) < 1) continue;
-    // Round length the price is bookable for (9/18) — NOT the course's total.
-    const holes = t.default_price?.bookable_holes ?? t.course?.holes ?? 18;
+    // Round length must be the exact bookable round length for this price.
+    const holes = t.default_price?.bookable_holes;
     if (holes !== 9 && holes !== 18) continue;
     out.push({
       // Stable + unique per (course, date, round length, tee time).

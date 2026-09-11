@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, CheckCircle2, KeyRound, ShieldCheck } from "lucide-react";
 import {
@@ -8,6 +8,12 @@ import {
   PROVIDER_ACCOUNT_LINKS,
 } from "@/lib/providers/config";
 import { providerConnectionKey } from "@/lib/provider-connections";
+import {
+  buildFairwayConnectionReturnUrl,
+  cleanProviderConnectionCallbackUrl,
+  parseProviderConnectionCallback,
+  providerLoginUrlWithReturn,
+} from "@/lib/provider-callback";
 import { useProviderConnections } from "@/lib/useProviderConnections";
 import { useLanguage } from "@/lib/i18n";
 
@@ -17,6 +23,13 @@ export function ProviderAccounts() {
   const { connectedCount, isConnected, saveConnection, removeConnection } =
     useProviderConnections();
   const { t } = useLanguage();
+
+  useEffect(() => {
+    const callback = parseProviderConnectionCallback(window.location.href);
+    if (!callback) return;
+    saveConnection(callback.providerId, callback.href);
+    window.history.replaceState(null, "", cleanProviderConnectionCallbackUrl(window.location.href));
+  }, [saveConnection]);
 
   return (
     <section
@@ -150,7 +163,13 @@ export function ProviderAccounts() {
                     type="button"
                     onClick={() => {
                       setOpenedKey(connectionKey);
-                      window.open(href, "_blank", "noopener,noreferrer");
+                      const returnUrl = buildFairwayConnectionReturnUrl(
+                        provider.id,
+                        href,
+                        window.location.href,
+                      );
+                      const loginUrl = providerLoginUrlWithReturn(provider.id, href, returnUrl);
+                      window.open(loginUrl, "_blank", "noopener,noreferrer");
                     }}
                     className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#153528] px-5 py-3 text-center text-sm font-bold text-[#fffdf7] transition hover:bg-[#214d3a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#153528]"
                   >

@@ -53,6 +53,7 @@ test('autobook opens only an exact provider-confirmed live slot', async () => {
     if (url.includes('/marketplace/v2/teetimes?')) {
       return Response.json({ status: 'open', teetimes: [{
         start_time: '06:30', date: '2099-07-10', max_player_size: 4,
+        course: { uuid: 'course-st-rose', holes: 18 },
         default_price: { green_fee: 72, bookable_holes: 18 },
       }] });
     }
@@ -79,6 +80,7 @@ test('autobook stops when the selected slot disappeared from Chronogolf', async 
     if (url.includes('/marketplace/v2/teetimes?')) {
       return Response.json({ status: 'open', teetimes: [{
         start_time: '07:10', date: '2099-07-10', max_player_size: 4,
+        course: { uuid: 'course-st-rose', holes: 18 },
         default_price: { green_fee: 72, bookable_holes: 18 },
       }] });
     }
@@ -89,6 +91,33 @@ test('autobook stops when the selected slot disappeared from Chronogolf', async 
     assert.equal(response.status, 409);
     const json = await response.json();
     assert.equal(json.ok, false);
+    assert.equal(json.reason, 'changed');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
+test('autobook blocks the reported St-Rose 6:30 slot when Chronogolf no longer lists it', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url.includes('/marketplace/v2/clubs/golf-sainte-rose')) {
+      return Response.json({ courses: [{ uuid: 'course-st-rose', holes: 18 }] });
+    }
+    if (url.includes('/marketplace/v2/teetimes?')) {
+      return Response.json({ status: 'open', teetimes: [{
+        start_time: '09:40', date: '2099-07-10', max_player_size: 4,
+        course: { uuid: 'course-st-rose', holes: 18 },
+        default_price: { green_fee: 72, bookable_holes: 18 },
+      }] });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+  try {
+    const response = await POST(request(livePayload));
+    assert.equal(response.status, 409);
+    const json = await response.json();
     assert.equal(json.reason, 'changed');
   } finally {
     globalThis.fetch = originalFetch;

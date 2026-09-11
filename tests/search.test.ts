@@ -47,6 +47,7 @@ test('preserves cents and rejects unavailable or mismatched live inventory', () 
     {...good, max_player_size: 0},
     {...good, max_player_size: undefined},
     {...good, date: '2099-07-11'},
+    {...good, date: undefined},
     {...good, start_time: '25:99'},
     {...good, default_price: { green_fee: 0, bookable_holes: 18 }},
     {...good, default_price: { green_fee: Number.POSITIVE_INFINITY, bookable_holes: 18 }},
@@ -221,4 +222,85 @@ test('TeeTime pages parse into live GTA tee times', async () => {
 test('past tee times cannot appear as bookable inventory', () => {
   const row: TeeTime = { id:'past',courseId:'test',date:'2020-01-01',time:'13:00',minutes:780,price:50,players:4,holes:18,cart:false,source:'live',bookingUrl:course.bookingUrl };
   assert.deepEqual(applySearch([row],new Map([[course.id,course]]),{...parseSearchQuery(params()),date:'2020-01-01'}),[]);
+});
+
+
+test('Chronogolf parser rejects blocked, member-only or vague rows before they become tee-time cards', () => {
+  const base = { start_time: '06:30', date: '2099-07-10', max_player_size: 4, default_price: { green_fee: 48, bookable_holes: 18 } };
+  const rows = parseTeetimesResponse(course, '2099-07-10', { status: 'open', teetimes: [
+    { ...base, frozen: true },
+    { ...base, disabled: true },
+    { ...base, available: false },
+    { ...base, bookable: false },
+    { ...base, format: 'league' },
+    { ...base, default_price: { green_fee: 48, bookable_holes: 18, affiliation_type: 'Membre' } },
+    { ...base, default_price: { green_fee: 48, bookable_holes: 18, affiliation_type: 'Member guest' } },
+    { ...base, default_price: { green_fee: 48 } },
+  ] });
+  assert.deepEqual(rows, []);
+});
+
+test('Chronogolf parser can require the returned course uuid to match the searched course', () => {
+  const base = { start_time: '09:10', date: '2099-07-10', max_player_size: 4, course: { uuid: 'course-a', holes: 18 }, default_price: { green_fee: 88, bookable_holes: 18 } };
+  const rows = parseTeetimesResponse(course, '2099-07-10', { status: 'open', teetimes: [
+    { ...base, course: { uuid: 'other-course', holes: 18 } },
+    { ...base, course: undefined },
+    base,
+  ] }, new Set(['course-a']));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].time, '09:10');
+});
+
+test('TeeTime pages require exact row-level date, price, capacity and holes', async () => {
+  const originalFetch = globalThis.fetch;
+  const torontoCourse: GolfCourse = {
+    id: 'extra-test-teetime-club',
+    market: 'toronto',
+    name: 'Test TeeTime Club',
+    city: 'Toronto',
+    region: 'Toronto Core',
+    holes: [18],
+    distanceKm: 10,
+    lat: 43.7,
+    lng: -79.4,
+    source: 'teetime',
+    teeTimeSlug: 'test-teetime-club',
+    online: true,
+    access: 'public',
+    bookingUrl: 'https://tee-time.com/clubs/test-teetime-club',
+  };
+  const payload = {
+    props: {
+      organization: {
+        availabilities: {
+          '0630': {
+            holes: '18',
+            priceFrom: 48,
+            group_size: '4',
+            teeTimes: [
+              { id: 'no-date', time: 630, holes: 18, price: 48, group_size: 4 },
+              { id: 'wrong-date', date: '2099-07-11 00:00:00', time: 630, holes: 18, price: 48, group_size: 4 },
+              { id: 'bucket-price-only', date: '2099-07-10 00:00:00', time: 630, holes: 18, group_size: 4 },
+              { id: 'bucket-size-only', date: '2099-07-10 00:00:00', time: 630, holes: 18, price: 48 },
+              { id: 'bucket-holes-only', date: '2099-07-10 00:00:00', time: 630, price: 48, group_size: 4 },
+              { id: 'exact', date: '2099-07-10 00:00:00', time: 650, holes: 18, price: 92, group_size: 3 },
+            ],
+          },
+        },
+      },
+    },
+  };
+  globalThis.fetch = (async () => new Response(
+    `<div id="app" data-page="${JSON.stringify(payload).replaceAll('"', '&quot;')}"></div>`,
+    { status: 200, headers: { 'content-type': 'text/html' } },
+  )) as typeof fetch;
+  try {
+    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, '2099-07-10');
+    assert.equal(rows?.length, 1);
+    assert.equal(rows?.[0].id.includes('exact'), true);
+    assert.equal(rows?.[0].price, 92);
+    assert.equal(rows?.[0].players, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
