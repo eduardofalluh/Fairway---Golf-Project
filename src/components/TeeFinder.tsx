@@ -866,9 +866,20 @@ function ResultCard({
     isLive && providerConnected && provider.id !== "course" && Boolean(handoffUrl);
   return (
     <div
+      role={isLive ? "button" : undefined}
+      tabIndex={isLive ? 0 : undefined}
+      onClick={isLive ? onBook : undefined}
+      onKeyDown={(event) => {
+        if (!isLive) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onBook();
+        }
+      }}
+      aria-label={isLive ? t.search.openDetails(r.course.name) : undefined}
       className={`group flex flex-col gap-4 rounded-2xl border p-5 transition hover:bg-surface sm:flex-row sm:items-center ${
         isLive
-          ? "border-forest/25 bg-surface hover:border-forest/50"
+          ? "cursor-pointer border-forest/25 bg-surface hover:border-forest/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime"
           : "border-line bg-surface/70 hover:border-forest/30"
       }`}
     >
@@ -956,11 +967,14 @@ function ResultCard({
         {isLive ? (
           <button
             type="button"
-            onClick={onBook}
-            aria-label={showConnectedBooking ? t.search.bookWithConnected(r.course.name, provider.name) : undefined}
+            onClick={(event) => {
+              event.stopPropagation();
+              onBook();
+            }}
+            aria-label={showConnectedBooking ? t.search.bookWithConnected(r.course.name, provider.name) : t.search.openDetails(r.course.name)}
             className="shrink-0 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-soft sm:px-5"
           >
-            {showConnectedBooking ? t.search.bookWith(provider.name) : t.search.review}
+            {t.search.review}
           </button>
         ) : (
           <span className="shrink-0 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-fog sm:px-5">

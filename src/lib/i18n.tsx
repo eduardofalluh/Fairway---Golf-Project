@@ -136,6 +136,7 @@ type Copy = {
     unavailablePerPlayer: string;
     unavailable: string;
     bookWithConnected: (course: string, provider: string) => string;
+    openDetails: (course: string) => string;
     bookWith: (provider: string) => string;
     review: string;
     check: string;
@@ -370,9 +371,10 @@ export const copy: Record<Language, Copy> = {
       estimatedPerPlayer: "not provider-confirmed",
       unavailablePerPlayer: "not provider-confirmed",
       unavailable: "Unavailable",
-      bookWithConnected: (course, provider) => `Book ${course} with connected ${provider} account`,
-      bookWith: (provider) => `Book with ${provider} ↗`,
-      review: "Review",
+      bookWithConnected: (course, provider) => `Review ${course} before continuing with connected ${provider}`,
+      openDetails: (course) => `Review details for ${course}`,
+      bookWith: (provider) => `Continue with ${provider} ↗`,
+      review: "Review details",
       check: "Check",
     },
     booking: {
@@ -629,9 +631,10 @@ export const copy: Record<Language, Copy> = {
       estimatedPerPlayer: "non confirmé par le fournisseur",
       unavailablePerPlayer: "non confirmé par le fournisseur",
       unavailable: "Indisponible",
-      bookWithConnected: (course, provider) => `Réserver ${course} avec le compte ${provider} connecté`,
-      bookWith: (provider) => `Réserver avec ${provider} ↗`,
-      review: "Voir",
+      bookWithConnected: (course, provider) => `Voir ${course} avant de continuer avec le compte ${provider} connecté`,
+      openDetails: (course) => `Voir les détails pour ${course}`,
+      bookWith: (provider) => `Continuer avec ${provider} ↗`,
+      review: "Voir les détails",
       check: "Vérifier",
     },
     booking: {
