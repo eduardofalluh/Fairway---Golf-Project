@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { LocateFixed, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 import type { GolfCourse, MarketId, Region, TeeTimeResult } from "@/lib/types";
 import type { SearchResponse } from "@/lib/aggregator";
@@ -111,6 +112,10 @@ export function TeeFinder() {
   const marketConfig = MARKETS[market];
   const regionOptions = MARKET_REGIONS[market];
   const marketArea = t.search.marketArea[market] ?? marketConfig.areaLabel;
+  const marketDescriptions: Record<MarketId, string> = {
+    montreal: lang === "fr" ? "Chronogolf, MinuteGolf et portails GGGolf locaux." : "Chronogolf, MinuteGolf, and local GGGolf portals.",
+    toronto: lang === "fr" ? "TeeTime, Golf the 6ix, GolfNow et clubs de la RGT." : "TeeTime, Golf the 6ix, GolfNow, and GTA clubs.",
+  };
 
   // Location + view
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -285,16 +290,17 @@ export function TeeFinder() {
         whileInView={{ opacity: 1, y: 0, scale: 1 }}
         viewport={{ once: false, amount: 0.14 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="rounded-[1.5rem] border border-line bg-surface p-4 shadow-[0_24px_80px_rgba(34,55,44,.08)] sm:rounded-[2rem] sm:p-8 lg:p-10"
+        className="relative overflow-hidden rounded-[1.5rem] border border-line bg-[linear-gradient(180deg,#fffdf7_0%,#faf7ef_100%)] p-4 shadow-[0_24px_80px_rgba(34,55,44,.08)] sm:rounded-[2rem] sm:p-8 lg:p-10"
       >
-        <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-forest via-lime to-transparent opacity-80" />
+        <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
           {(["montreal", "toronto"] as const).map((id) => (
             <button
               key={id}
               type="button"
               onClick={() => chooseMarket(id)}
               aria-pressed={market === id}
-              className={`rounded-2xl border px-3 py-3 text-left transition sm:px-5 sm:py-4 ${
+              className={`min-h-[88px] rounded-2xl border px-3 py-3 text-left transition sm:px-5 sm:py-4 ${
                 market === id
                   ? "border-forest bg-forest text-white shadow-[0_14px_30px_rgba(10,52,34,0.16)]"
                   : "border-line bg-base-2 text-fog hover:border-forest hover:text-cream"
@@ -305,6 +311,9 @@ export function TeeFinder() {
               </span>
               <span className="mt-1 block font-display text-xl font-semibold leading-none sm:text-2xl">
                 {t.search.marketArea[id] ?? MARKETS[id].areaLabel}
+              </span>
+              <span className={`mt-2 block text-xs leading-5 ${market === id ? "text-white/70" : "text-fog"}`}>
+                {marketDescriptions[id]}
               </span>
             </button>
           ))}
@@ -580,7 +589,7 @@ export function TeeFinder() {
                   }`}
                   title={t.search.useLocationTitle}
                 >
-                  <span aria-hidden>📍</span>
+                  <LocateFixed aria-hidden="true" size={17} />
                   {geoBusy ? t.search.locating : userLoc ? t.search.usingLocation : t.search.useLocation}
                 </button>
 
@@ -638,7 +647,7 @@ export function TeeFinder() {
                 className="mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-lime/30 bg-lime/[0.06] px-4 py-3 text-left transition hover:border-lime/60"
               >
                 <span className="text-sm text-cream">
-                  📍 {t.search.closest}:{" "}
+                  <MapPin aria-hidden="true" size={16} className="inline -translate-y-0.5 text-lime" /> {t.search.closest}:{" "}
                   <span className="font-semibold">{nearest.name}</span>
                   <span className="text-fog">
                     {" "}
@@ -877,7 +886,7 @@ function ResultCard({
         }
       }}
       aria-label={isLive ? t.search.openDetails(r.course.name) : undefined}
-      className={`group flex flex-col gap-4 rounded-2xl border p-5 transition hover:bg-surface sm:flex-row sm:items-center ${
+      className={`group flex flex-col gap-4 rounded-2xl border p-4 shadow-[0_14px_40px_rgba(34,55,44,.06)] transition duration-300 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_22px_60px_rgba(34,55,44,.12)] sm:flex-row sm:items-center sm:p-5 ${
         isLive
           ? "cursor-pointer border-forest/25 bg-surface hover:border-forest/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lime"
           : "border-line bg-surface/70 hover:border-forest/30"
@@ -888,7 +897,7 @@ function ResultCard({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={r.course.photo ?? "/hero.jpg"} alt="" loading="lazy" onError={(event) => { event.currentTarget.src = "/hero.jpg"; }} className="h-full w-full object-cover" />
           <div className="absolute inset-x-0 bottom-0 flex items-baseline justify-center gap-1 bg-forest/85 px-2 py-1.5 text-white backdrop-blur-sm">
-            <span className="font-display text-base font-bold leading-none">{formatTime12(r.time).split(" ")[0]}</span>
+            <span className="font-display text-base font-bold leading-none tabular-nums">{formatTime12(r.time).split(" ")[0]}</span>
             <span className="text-[9px] font-semibold uppercase tracking-wider text-white/70">{formatTime12(r.time).split(" ")[1]}</span>
           </div>
         </div>
@@ -922,6 +931,7 @@ function ResultCard({
             {r.course.city} · {r.course.region} ·{" "}
             {fromYouKm != null ? (
               <span className="text-cream">
+                <MapPin aria-hidden="true" size={13} className="mr-1 inline -translate-y-0.5 text-lime" />
                 {t.search.distanceFromYou(fromYouKm, driveMinutes(fromYouKm))}
               </span>
             ) : (
@@ -942,7 +952,7 @@ function ResultCard({
               </span>
             )}
             {isLive ? (
-              <span className="font-display text-xl font-extrabold text-cream sm:text-2xl">
+              <span className="font-display text-xl font-extrabold tabular-nums text-cream sm:text-2xl">
                 {formatPrice(r.price)}
               </span>
             ) : (

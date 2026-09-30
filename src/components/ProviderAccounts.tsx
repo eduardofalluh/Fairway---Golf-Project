@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, CheckCircle2, KeyRound, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, KeyRound, MapPinned, ShieldCheck } from "lucide-react";
 import {
   GGGOLF_CLUB_PORTALS,
   PROVIDER_ACCOUNT_LINKS,
@@ -15,14 +15,27 @@ import {
   providerLoginUrlWithReturn,
 } from "@/lib/provider-callback";
 import { useProviderConnections } from "@/lib/useProviderConnections";
-import { useLanguage } from "@/lib/i18n";
+import { useLanguage, type Language } from "@/lib/i18n";
+
+function providerScope(providerId: string, lang: Language) {
+  if (providerId === "teetime" || providerId === "golfthe6ix" || providerId === "golfnow") {
+    return lang === "fr" ? "Toronto + RGT" : "Toronto + GTA";
+  }
+  if (providerId === "chronogolf") {
+    return lang === "fr" ? "Canada + Québec" : "Canada + Québec";
+  }
+  if (providerId === "gggolf" || providerId === "minutegolf") {
+    return lang === "fr" ? "Clubs du Québec" : "Québec clubs";
+  }
+  return lang === "fr" ? "Fournisseur" : "Provider";
+}
 
 export function ProviderAccounts() {
   const [openedKey, setOpenedKey] = useState<string | null>(null);
   const [gggolfPortal, setGggolfPortal] = useState("");
   const { connectedCount, isConnected, saveConnection, removeConnection } =
     useProviderConnections();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
 
   useEffect(() => {
     const callback = parseProviderConnectionCallback(window.location.href);
@@ -35,8 +48,9 @@ export function ProviderAccounts() {
     <section
       id="accounts"
       aria-labelledby="provider-accounts-title"
-      className="border-b border-[#d6cebd] bg-[#f3efe4] px-4 py-12 text-[#153528] sm:px-8 sm:py-16 lg:py-20"
+      className="relative overflow-hidden border-b border-[#d6cebd] bg-[radial-gradient(circle_at_18%_6%,rgba(202,236,85,.18),transparent_24%),linear-gradient(180deg,#f7f3e8_0%,#eee8db_100%)] px-4 py-12 text-[#153528] sm:px-8 sm:py-16 lg:py-20"
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-lime to-transparent" />
       <div className="mx-auto max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 22 }}
@@ -92,14 +106,15 @@ export function ProviderAccounts() {
                 whileInView={{ opacity: 1, y: 0, scale: 1 }}
                 viewport={{ once: false, amount: 0.18 }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className={`rounded-[1.4rem] border p-5 shadow-[0_18px_55px_rgba(21,53,40,0.08)] sm:rounded-[1.75rem] sm:p-8 ${
+                className={`group relative overflow-hidden rounded-[1.4rem] border p-5 shadow-[0_18px_55px_rgba(21,53,40,0.08)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_26px_70px_rgba(21,53,40,0.14)] sm:rounded-[1.75rem] sm:p-8 ${
                   providerConnected
                     ? "border-[#9eb58b] bg-[#f8fff1]"
                     : "border-[#cbd3c7] bg-[#fffdf7]"
                 }`}
               >
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#caec55] via-[#b8d64d] to-transparent opacity-80" />
                 <div className="flex items-start justify-between gap-5">
-                  <span className="grid size-12 place-items-center rounded-2xl bg-[#153528] text-[#f4c95d]">
+                  <span className="grid size-12 place-items-center rounded-2xl bg-[#153528] text-[#caec55] shadow-[inset_0_1px_0_rgba(255,255,255,.16)]">
                     <KeyRound aria-hidden="true" size={22} />
                   </span>
                   <span
@@ -117,9 +132,15 @@ export function ProviderAccounts() {
                     {providerConnected ? t.accounts.connectedStatus : t.accounts.providerHosted}
                   </span>
                 </div>
-                <h3 className="mt-5 font-display text-2xl font-bold sm:mt-7">
-                  {provider.name}
-                </h3>
+                <div className="mt-5 flex flex-wrap items-center gap-2 sm:mt-7">
+                  <h3 className="font-display text-2xl font-bold">
+                    {provider.name}
+                  </h3>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#153528]/7 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#547164]">
+                    <MapPinned aria-hidden="true" size={12} />
+                    {providerScope(provider.id, lang)}
+                  </span>
+                </div>
                 <p className="mt-2 min-h-12 text-sm leading-6 text-[#547164]">
                   {providerCopy?.description ?? provider.description}
                 </p>

@@ -25,6 +25,19 @@ test('central provider connections are provider-wide', () => {
   );
 });
 
+test('Toronto provider connections are provider-wide across booking URLs', () => {
+  const cases = [
+    ['teetime', 'https://tee-time.com/login', 'https://tee-time.com/clubs/pickering-glen-golf-club'] as const,
+    ['golfthe6ix', 'https://app.golfthe6ix.com/', 'https://app.golfthe6ix.com/booking'] as const,
+    ['golfnow', 'https://www.golfnow.com/login', 'https://www.golfnow.com/tee-times/facility/12345-course'] as const,
+  ];
+
+  for (const [provider, loginUrl, bookingUrl] of cases) {
+    assert.equal(providerConnectionKey(provider, loginUrl), `provider:${provider}`);
+    assert.equal(hasProviderConnection([`provider:${provider}`], provider, bookingUrl), true);
+  }
+});
+
 test('GGGolf club portal and tee sheet URLs share a club connection', () => {
   const login = 'https://secure.gggolf.ca/cerf/index.php?option=com_ggpublic&req=user&lang=fr';
   const teeSheet = 'https://secure.gggolf.ca/cerf/index.php?lang=fr&option=com_ggpublic&req=teetimes';

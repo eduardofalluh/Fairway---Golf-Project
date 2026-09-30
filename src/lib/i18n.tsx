@@ -35,6 +35,14 @@ type Copy = {
     explore: string;
     connect: string;
     body: string;
+    trustTitle: string;
+    marketStat: string;
+    marketValue: (count: number) => string;
+    courseStat: string;
+    courseValue: (count: number) => string;
+    verifiedStat: string;
+    verifiedValue: string;
+    trustBody: string;
     playVideo: string;
     pauseVideo: string;
     videoUnsupported: string;
@@ -230,6 +238,14 @@ export const copy: Record<Language, Copy> = {
       explore: "Explore tee times",
       connect: "Connect accounts",
       body: "Compare nearby courses and green fees. Find a time that fits.",
+      trustTitle: "Ready before checkout",
+      marketStat: "Markets",
+      marketValue: (count) => `${count} live areas`,
+      courseStat: "Courses",
+      courseValue: (count) => `${count} tracked`,
+      verifiedStat: "Before handoff",
+      verifiedValue: "Re-check live slot",
+      trustBody: "Fairway opens the review sheet first, then re-checks the provider before handoff.",
       playVideo: "Play background video",
       pauseVideo: "Pause background video",
       videoUnsupported: "Your browser does not support background video.",
@@ -363,7 +379,7 @@ export const copy: Record<Language, Copy> = {
       estimateBadge: "Unavailable",
       unavailableBadge: "Unavailable",
       connectedBadge: "Connected",
-      distanceFromYou: (km, minutes) => `📍 ${km} km · ~${minutes} min`,
+      distanceFromYou: (km, minutes) => `${km} km · ~${minutes} min`,
       cart: "cart",
       onBudget: "On budget",
       perPlayer: "per player",
@@ -490,6 +506,14 @@ export const copy: Record<Language, Copy> = {
       explore: "Voir les départs",
       connect: "Connecter les comptes",
       body: "Comparez les parcours près de vous et les droits de jeu. Trouvez l’heure qui vous convient.",
+      trustTitle: "Prêt avant de réserver",
+      marketStat: "Marchés",
+      marketValue: (count) => `${count} zones en direct`,
+      courseStat: "Parcours",
+      courseValue: (count) => `${count} suivis`,
+      verifiedStat: "Avant la redirection",
+      verifiedValue: "Revérification en direct",
+      trustBody: "Fairway ouvre d’abord la fiche de vérification, puis revérifie le fournisseur avant la redirection.",
       playVideo: "Lire la vidéo d’arrière-plan",
       pauseVideo: "Mettre la vidéo d’arrière-plan en pause",
       videoUnsupported: "Votre navigateur ne prend pas en charge la vidéo d’arrière-plan.",
@@ -623,7 +647,7 @@ export const copy: Record<Language, Copy> = {
       estimateBadge: "Indisponible",
       unavailableBadge: "Indisponible",
       connectedBadge: "Connecté",
-      distanceFromYou: (km, minutes) => `📍 ${km} km · ~${minutes} min`,
+      distanceFromYou: (km, minutes) => `${km} km · ~${minutes} min`,
       cart: "voiturette",
       onBudget: "Dans le budget",
       perPlayer: "par joueur",
