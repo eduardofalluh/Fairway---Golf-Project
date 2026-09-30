@@ -5,3 +5,11 @@
 [build.environment]
   NODE_VERSION = "22"
   NEXT_TELEMETRY_DISABLED = "1"
+
+# Netlify CLI deploys need the generated Next server handler reachable for
+# App Router route handlers such as /api/tee-times.
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/___netlify-server-handler"
+  status = 200
+  force = false
