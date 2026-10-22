@@ -183,7 +183,8 @@ function toCourse(market: MarketId, c: SearchCourse): GolfCourse | null {
   if (!c.uuid || !c.location) return null;
   // The radius crosses the US border; advertised fees here are CAD only.
   if (c.country !== "Canada") return null;
-  if (/\b(demo|test|sandbox)\b|lightspeed pas/i.test(c.name)) return null;
+  // Chronogolf's own demo/office listings ("Club Chronogolf") aren't courses.
+  if (/\b(demo|test|sandbox)\b|lightspeed pas|^club chronogolf$/i.test(c.name.trim())) return null;
   const { lat, lon } = c.location;
   const city = c.city ?? "";
   const holes = (c.holes && c.holes.length ? [...new Set(c.holes)] : [18]).filter(

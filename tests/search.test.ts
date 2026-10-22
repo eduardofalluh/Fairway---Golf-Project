@@ -373,3 +373,16 @@ test('TeeTime pages require exact row-level date, price, capacity and holes', as
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Chronogolf's own demo listings never appear as courses", async () => {
+  const fake = fakeChronogolf({
+    clubs: [stRoseClub, { ...stRoseClub, uuid: 'club-chronogolf', name: 'Club Chronogolf', slug: 'club-chronogolf', city: 'Rom' }],
+  });
+  try {
+    const { getChronogolfCourses } = await import('../src/lib/providers/chronogolf');
+    const names = (await getChronogolfCourses('montreal')).map((c) => c.name);
+    assert.deepEqual(names, ['Golf Sainte-Rose']);
+  } finally {
+    fake.restore();
+  }
+});
