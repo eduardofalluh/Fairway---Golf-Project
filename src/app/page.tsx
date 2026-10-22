@@ -5,6 +5,7 @@ import { SearchProvider } from "@/components/search/SearchProvider";
 import { FiltersSheet } from "@/components/search/FiltersSheet";
 import { Results } from "@/components/results/Results";
 import { BookingSheet } from "@/components/BookingSheet";
+import { BookingAccounts } from "@/components/BookingAccounts";
 import { HowItWorks, Faq, Footer } from "@/components/Sections";
 import { getDirectory } from "@/lib/aggregator";
 import { emailConfigured } from "@/lib/email-config";
@@ -29,6 +30,7 @@ export default async function Home() {
         <Hero courseCount={courses.length} />
         <CourseMarquee names={names} />
         <Results />
+        <BookingAccounts />
         <HowItWorks />
         <Faq />
       </main>

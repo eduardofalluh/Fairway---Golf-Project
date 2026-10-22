@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Pause, Play } from "lucide-react";
+import { ArrowRight, KeyRound, Pause, Play } from "lucide-react";
+import { useProviderConnections } from "@/lib/useProviderConnections";
 import { useLanguage } from "@/lib/i18n";
 import { useSearch } from "./search/SearchProvider";
 import {
@@ -100,6 +101,24 @@ function HeroSearch() {
   );
 }
 
+/** A shortcut to the booking-app sign-ins, showing how many are already done. */
+function AccountsShortcut() {
+  const { t } = useLanguage();
+  const { connectedCount } = useProviderConnections();
+  return (
+    <motion.a
+      href="#accounts"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.95, duration: 0.4 }}
+      className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full px-1 text-xs font-bold tracking-wide text-white/80 underline-offset-4 transition hover:text-lime hover:underline"
+    >
+      <KeyRound aria-hidden size={14} className={connectedCount ? "text-lime" : ""} />
+      {t.hero.accounts(connectedCount)}
+    </motion.a>
+  );
+}
+
 export function Hero({ courseCount }: { courseCount: number }) {
   const sectionRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -179,6 +198,7 @@ export function Hero({ courseCount }: { courseCount: number }) {
         </motion.p>
         <HeroSearch />
         <QuickDates />
+        <AccountsShortcut />
       </motion.div>
 
       <button

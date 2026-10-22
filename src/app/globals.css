@@ -176,6 +176,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 #top,
 #results,
+#accounts,
 #how,
 #faq {
   scroll-margin-top: 5.5rem;

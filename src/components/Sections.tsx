@@ -81,7 +81,7 @@ export function Footer() {
     <footer className="bg-forest text-white">
       <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-12 sm:px-8 md:grid-cols-3 md:items-end lg:px-10">
         <div><div className="flex items-center gap-2.5 font-display text-2xl font-semibold"><span className="grid h-8 w-8 place-items-center rounded-full bg-lime text-forest"><Flag size={15} fill="currentColor" /></span>Fairway</div><p className="mt-3 max-w-xs text-sm leading-6 text-white/55">{t.sections.footerBody}</p></div>
-        <div className="flex gap-6 text-xs font-semibold uppercase tracking-[.14em] text-white/65 md:justify-center"><a href="#top" className="hover:text-lime">{t.sections.footerSearch}</a><a href="#how" className="hover:text-lime">{t.sections.footerHow}</a><a href="#faq" className="hover:text-lime">{t.sections.footerFaq}</a></div>
+        <div className="flex gap-6 text-xs font-semibold uppercase tracking-[.14em] text-white/65 md:justify-center"><a href="#top" className="hover:text-lime">{t.sections.footerSearch}</a><a href="#accounts" className="hover:text-lime">{t.sections.footerAccounts}</a><a href="#how" className="hover:text-lime">{t.sections.footerHow}</a><a href="#faq" className="hover:text-lime">{t.sections.footerFaq}</a></div>
         <p className="text-xs text-white/45 md:text-right">© {new Date().getFullYear()} Fairway · {t.sections.footerNote}</p>
       </div>
     </footer>

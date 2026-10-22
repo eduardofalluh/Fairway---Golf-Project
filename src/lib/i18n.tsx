@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { BookingProviderId } from "@/lib/providers/config";
 import type { MarketId, ProviderId, SortKey } from "@/lib/types";
 
 export type Language = "en" | "fr";
@@ -17,6 +18,7 @@ type Copy = {
   toggleLabel: string;
   nav: {
     teeTimes: string;
+    accounts: string;
     how: string;
     faq: string;
     find: string;
@@ -30,6 +32,26 @@ type Copy = {
     playVideo: string;
     pauseVideo: string;
     videoUnsupported: string;
+    accounts: (connected: number) => string;
+  };
+  accounts: {
+    eyebrow: string;
+    title: string;
+    body: string;
+    connectedCount: (count: number) => string;
+    scope: Partial<Record<BookingProviderId, string>>;
+    description: Partial<Record<BookingProviderId, string>>;
+    signIn: (provider: string) => string;
+    signInClub: (club: string) => string;
+    chooseClub: (count: number) => string;
+    yourClub: string;
+    pickClubFirst: string;
+    confirm: string;
+    confirmHint: (provider: string) => string;
+    signedIn: string;
+    forget: string;
+    clubHelp: string;
+    note: string;
   };
   search: {
     label: string;
@@ -139,7 +161,10 @@ type Copy = {
     openAnyway: (provider: string) => string;
     pickAnother: string;
     signInFirst: (provider: string) => string;
-    steps: { check: (date: string, time: string) => string; signIn: string; confirm: string };
+    signedInHere: (provider: string) => string;
+    markSignedIn: string;
+    bookOn: (provider: string) => string;
+    steps: { check: (date: string, time: string) => string; signIn: string; signedIn: string; confirm: string };
     noReservation: string;
     emailDetails: string;
     emailLabel: string;
@@ -159,6 +184,7 @@ type Copy = {
     faqs: Array<{ q: string; a: string }>;
     footerBody: string;
     footerSearch: string;
+    footerAccounts: string;
     footerHow: string;
     footerFaq: string;
     footerNote: string;
@@ -171,7 +197,7 @@ export const copy: Record<Language, Copy> = {
   en: {
     langName: "English",
     toggleLabel: "Language",
-    nav: { teeTimes: "Tee times", how: "How it works", faq: "FAQ", find: "Find a tee time", home: "Fairway home" },
+    nav: { teeTimes: "Tee times", accounts: "Accounts", how: "How it works", faq: "FAQ", find: "Find a tee time", home: "Fairway home" },
     hero: {
       eyebrow: (count) => (count > 0 ? `Montréal + Toronto · ${count} courses, one search` : "Montréal + Toronto · one search"),
       title1: "Find your round.",
@@ -180,6 +206,40 @@ export const copy: Record<Language, Copy> = {
       playVideo: "Play background video",
       pauseVideo: "Pause background video",
       videoUnsupported: "Your browser does not support background video.",
+      accounts: (n) => (n > 0 ? `Booking apps · ${n} signed in` : "Sign in to booking apps"),
+    },
+    accounts: {
+      eyebrow: "Book faster",
+      title: "Sign in once.\nBook in a tap.",
+      body: "Sign in to the booking apps your courses use. Fairway remembers which ones you're signed in to on this device, so picking a tee time takes you straight to checkout.",
+      connectedCount: (n) => (n === 0 ? "None signed in yet" : `${plural(n, "app", "apps")} signed in on this device`),
+      scope: {
+        chronogolf: "Québec + Ontario",
+        teetime: "Toronto + GTA",
+        golfthe6ix: "City of Toronto",
+        golfnow: "Toronto + GTA",
+        minutegolf: "Québec clubs",
+        gggolf: "Québec clubs",
+      },
+      description: {
+        chronogolf: "Most live tee times on Fairway book through Chronogolf.",
+        teetime: "GTA clubs with live TeeTime sheets.",
+        golfthe6ix: "Booking for the City of Toronto's courses.",
+        golfnow: "GolfNow's network of GTA courses.",
+        minutegolf: "MinuteGolf member access for Québec clubs.",
+        gggolf: "Each GGGolf club has its own login. Pick yours.",
+      },
+      signIn: (p) => `Sign in on ${p}`,
+      signInClub: (club) => `Sign in · ${club}`,
+      chooseClub: (n) => `Choose your club (${n})`,
+      yourClub: "Your club",
+      pickClubFirst: "Pick your club to sign in",
+      confirm: "I'm signed in",
+      confirmHint: (p) => `Signed in on ${p}? Confirm so Fairway can skip that step when you book.`,
+      signedIn: "Signed in",
+      forget: "Forget on this device",
+      clubHelp: "Club not listed? Find its login",
+      note: "Sign-in happens on each provider's own site. Fairway never sees your password or card, and only remembers on this device that you signed in.",
     },
     search: {
       label: "Search tee times",
@@ -298,10 +358,14 @@ export const copy: Record<Language, Copy> = {
       continueOn: (p) => `Continue on ${p}`,
       openAnyway: (p) => `Open ${p} anyway`,
       pickAnother: "Back to tee times",
-      signInFirst: (p) => `Have a ${p} account? Sign in first`,
+      signInFirst: (p) => `Sign in on ${p} first`,
+      signedInHere: (p) => `Signed in to ${p} on this device`,
+      markSignedIn: "I'm signed in",
+      bookOn: (p) => `Book on ${p}`,
       steps: {
         check: (date, time) => `Pick ${time} on ${date}`,
         signIn: "Sign in or check out as a guest",
+        signedIn: "You're already signed in — no login needed",
         confirm: "Confirm and pay with the course",
       },
       noReservation: "Fairway doesn't hold or book the slot. The course's confirmation is your booking.",
@@ -332,6 +396,7 @@ export const copy: Record<Language, Copy> = {
       ],
       footerBody: "One search for tee times around Montréal and Toronto.",
       footerSearch: "Search",
+      footerAccounts: "Accounts",
       footerHow: "How it works",
       footerFaq: "FAQ",
       footerNote: "Bookings are confirmed by each course.",
@@ -340,7 +405,7 @@ export const copy: Record<Language, Copy> = {
   fr: {
     langName: "Français",
     toggleLabel: "Langue",
-    nav: { teeTimes: "Départs", how: "Fonctionnement", faq: "FAQ", find: "Trouver un départ", home: "Accueil Fairway" },
+    nav: { teeTimes: "Départs", accounts: "Comptes", how: "Fonctionnement", faq: "FAQ", find: "Trouver un départ", home: "Accueil Fairway" },
     hero: {
       eyebrow: (count) => (count > 0 ? `Montréal + Toronto · ${count} parcours, une recherche` : "Montréal + Toronto · une recherche"),
       title1: "Trouvez votre ronde.",
@@ -349,6 +414,40 @@ export const copy: Record<Language, Copy> = {
       playVideo: "Lire la vidéo d’arrière-plan",
       pauseVideo: "Mettre la vidéo en pause",
       videoUnsupported: "Votre navigateur ne prend pas en charge la vidéo d’arrière-plan.",
+      accounts: (n) => (n > 0 ? `Applis de réservation · ${n} connectée${n > 1 ? "s" : ""}` : "Se connecter aux applis de réservation"),
+    },
+    accounts: {
+      eyebrow: "Réservez plus vite",
+      title: "Connectez-vous une fois.\nRéservez en un geste.",
+      body: "Connectez-vous aux applis de réservation qu’utilisent vos parcours. Fairway retient sur cet appareil celles où vous êtes connecté, pour vous mener droit au paiement quand vous choisissez un départ.",
+      connectedCount: (n) => (n === 0 ? "Aucune connexion pour l’instant" : `${plural(n, "appli connectée", "applis connectées")} sur cet appareil`),
+      scope: {
+        chronogolf: "Québec + Ontario",
+        teetime: "Toronto + RGT",
+        golfthe6ix: "Ville de Toronto",
+        golfnow: "Toronto + RGT",
+        minutegolf: "Clubs du Québec",
+        gggolf: "Clubs du Québec",
+      },
+      description: {
+        chronogolf: "La plupart des départs en direct sur Fairway se réservent avec Chronogolf.",
+        teetime: "Clubs de la RGT avec feuilles TeeTime en direct.",
+        golfthe6ix: "Réservation des parcours de la Ville de Toronto.",
+        golfnow: "Le réseau de parcours GolfNow dans la RGT.",
+        minutegolf: "Accès membre MinuteGolf pour les clubs du Québec.",
+        gggolf: "Chaque club GGGolf a sa propre connexion. Choisissez le vôtre.",
+      },
+      signIn: (p) => `Se connecter sur ${p}`,
+      signInClub: (club) => `Se connecter · ${club}`,
+      chooseClub: (n) => `Choisissez votre club (${n})`,
+      yourClub: "Votre club",
+      pickClubFirst: "Choisissez votre club pour vous connecter",
+      confirm: "Je suis connecté",
+      confirmHint: (p) => `Connecté sur ${p}? Confirmez pour que Fairway saute cette étape à la réservation.`,
+      signedIn: "Connecté",
+      forget: "Oublier sur cet appareil",
+      clubHelp: "Club absent? Trouvez sa connexion",
+      note: "La connexion se fait sur le site de chaque fournisseur. Fairway ne voit jamais votre mot de passe ni votre carte et retient seulement, sur cet appareil, que vous êtes connecté.",
     },
     search: {
       label: "Rechercher des départs",
@@ -467,10 +566,14 @@ export const copy: Record<Language, Copy> = {
       continueOn: (p) => `Continuer sur ${p}`,
       openAnyway: (p) => `Ouvrir ${p} quand même`,
       pickAnother: "Retour aux départs",
-      signInFirst: (p) => `Vous avez un compte ${p}? Connectez-vous d’abord`,
+      signInFirst: (p) => `Se connecter sur ${p} d’abord`,
+      signedInHere: (p) => `Connecté à ${p} sur cet appareil`,
+      markSignedIn: "Je suis connecté",
+      bookOn: (p) => `Réserver sur ${p}`,
       steps: {
         check: (date, time) => `Choisissez ${time} le ${date}`,
         signIn: "Connectez-vous ou payez comme invité",
+        signedIn: "Vous êtes déjà connecté — aucune connexion requise",
         confirm: "Confirmez et payez auprès du parcours",
       },
       noReservation: "Fairway ne retient ni ne réserve le départ. La confirmation du parcours fait foi.",
@@ -501,6 +604,7 @@ export const copy: Record<Language, Copy> = {
       ],
       footerBody: "Une seule recherche pour les départs autour de Montréal et Toronto.",
       footerSearch: "Chercher",
+      footerAccounts: "Comptes",
       footerHow: "Fonctionnement",
       footerFaq: "FAQ",
       footerNote: "Chaque parcours confirme sa réservation.",

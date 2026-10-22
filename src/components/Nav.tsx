@@ -99,6 +99,7 @@ export function Nav() {
                 className={`hidden items-center gap-8 text-xs font-semibold uppercase tracking-[0.14em] md:flex ${solid ? "text-fog" : "text-white/80"}`}
               >
                 <a href="#results" className="transition hover:text-lime">{t.nav.teeTimes}</a>
+                <a href="#accounts" className="transition hover:text-lime">{t.nav.accounts}</a>
                 <a href="#how" className="transition hover:text-lime">{t.nav.how}</a>
                 <a href="#faq" className="transition hover:text-lime">{t.nav.faq}</a>
               </motion.div>

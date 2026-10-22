@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ArrowUpRight, Calendar, Info, Mail, MapPin, Users } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Calendar, Check, Info, KeyRound, Mail, MapPin, Users } from "lucide-react";
 import { Sheet } from "./ui/Sheet";
 import { useSearch } from "./search/SearchProvider";
 import { formatPrice } from "@/lib/format";
 import { formatLongDateForLanguage, formatTimeForLanguage, timeParts, useLanguage } from "@/lib/i18n";
 import { getBookingProvider, PROVIDER_ACCOUNT_LINKS } from "@/lib/providers/config";
 import { useProfile } from "@/lib/useProfile";
+import { useProviderConnections } from "@/lib/useProviderConnections";
+import { openProviderLogin } from "./BookingAccounts";
 import type { TeeTimeResult } from "@/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -167,14 +169,69 @@ function EmailDetails({ tee, market }: { tee: TeeTimeResult; market: string }) {
   );
 }
 
+/** Signed-in state for this slot's provider, or a way to sign in without leaving. */
+function ProviderAccountRow({
+  providerId,
+  providerName,
+  loginHref,
+  signedIn,
+  onMarkSignedIn,
+}: {
+  providerId: NonNullable<(typeof PROVIDER_ACCOUNT_LINKS)[number]["id"]>;
+  providerName: string;
+  loginHref: string;
+  signedIn: boolean;
+  onMarkSignedIn: () => void;
+}) {
+  const { t } = useLanguage();
+  const [opened, setOpened] = useState(false);
+  if (signedIn) {
+    return (
+      <p className="inline-flex w-fit items-center gap-2 rounded-full bg-forest px-3 py-1.5 text-xs font-bold text-lime">
+        <Check aria-hidden size={14} /> {t.booking.signedInHere(providerName)}
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          setOpened(true);
+          openProviderLogin(providerId, loginHref);
+        }}
+        className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-forest/25 px-4 text-sm font-semibold text-forest transition hover:border-forest hover:bg-lime/20"
+      >
+        <KeyRound aria-hidden size={14} /> {t.booking.signInFirst(providerName)} <ArrowUpRight aria-hidden size={14} />
+      </button>
+      <AnimatePresence>
+        {opened && (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            onClick={onMarkSignedIn}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-lime/40 px-4 text-sm font-bold text-forest transition hover:bg-lime/60"
+          >
+            <Check aria-hidden size={14} /> {t.booking.markSignedIn}
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function BookingSheet() {
   const { booking: tee, closeBooking, query, emailEnabled } = useSearch();
   const { t, lang } = useLanguage();
   const check = useSlotCheck(tee, query.market);
+  const { isConnected, saveConnection } = useProviderConnections();
 
   const provider = tee ? getBookingProvider(tee.bookingUrl) : null;
   const providerName = provider && provider.id !== "course" ? provider.name : tee?.course.name ?? "";
   const login = PROVIDER_ACCOUNT_LINKS.find((link) => link.id === provider?.id);
+  const signedIn = Boolean(tee && login && isConnected(login.id, tee.bookingUrl));
   const time = tee ? timeParts(tee.time, lang) : null;
   const dateLabel = tee ? formatLongDateForLanguage(tee.date, lang) : "";
   const href = check.state === "verified" || check.state === "unverifiable" ? check.bookingUrl : null;
@@ -229,7 +286,9 @@ export function BookingSheet() {
                 whileTap={{ scale: 0.97 }}
                 className="shine flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-lime text-[15px] font-extrabold text-forest shadow-[0_12px_30px_rgba(202,236,85,.35)] transition-colors hover:bg-[#dcf887]"
               >
-                {check.state === "verified" ? t.booking.continueOn(providerName) : t.booking.openAnyway(providerName)}
+                {check.state === "verified"
+                  ? signedIn ? t.booking.bookOn(providerName) : t.booking.continueOn(providerName)
+                  : t.booking.openAnyway(providerName)}
                 <ArrowUpRight aria-hidden size={19} />
               </motion.a>
             ) : (
@@ -250,7 +309,7 @@ export function BookingSheet() {
               <Calendar aria-hidden size={17} className="mt-0.5 shrink-0 text-forest" />
               <div className="min-w-0">
                 <dt className="text-xs text-fog">{t.booking.date}</dt>
-                <dd className="font-semibold capitalize text-cream">{dateLabel}</dd>
+                <dd className="font-semibold text-cream first-letter:uppercase">{dateLabel}</dd>
               </div>
             </div>
             <div className="flex gap-2.5">
@@ -317,7 +376,7 @@ export function BookingSheet() {
             <ol className="grid gap-2 text-sm text-fog">
               {[
                 t.booking.steps.check(dateLabel, formatTimeForLanguage(tee.time, lang)),
-                t.booking.steps.signIn,
+                signedIn ? t.booking.steps.signedIn : t.booking.steps.signIn,
                 t.booking.steps.confirm,
               ].map((step, i) => (
                 <motion.li
@@ -335,14 +394,14 @@ export function BookingSheet() {
           )}
 
           {login && check.state !== "changed" && (
-            <a
-              href={login.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-forest underline-offset-4 hover:underline"
-            >
-              {t.booking.signInFirst(login.name)} <ArrowUpRight aria-hidden size={14} />
-            </a>
+            <ProviderAccountRow
+              key={tee.id}
+              providerId={login.id}
+              providerName={login.name}
+              loginHref={login.href}
+              signedIn={signedIn}
+              onMarkSignedIn={() => saveConnection(login.id, tee.bookingUrl)}
+            />
           )}
 
           {emailEnabled && check.state === "verified" && (
