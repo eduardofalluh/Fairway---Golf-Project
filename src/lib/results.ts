@@ -146,6 +146,7 @@ export function mergeProviderStates(states: ProviderState[]): ProviderState | nu
   const retryAfterSec = Math.max(0, ...states.map((s) => s.retryAfterSec ?? 0)) || undefined;
   if (worst.status === "ok") return { status: "ok" };
   const anyAnswered = states.some((s) => s.status === "ok" || s.status === "partial");
-  if (anyAnswered || okCount > 0) return { status: "partial", retryAfterSec };
-  return { status: worst.status, retryAfterSec };
+  const detail = states.find((s) => s.detail)?.detail;
+  if (anyAnswered || okCount > 0) return { status: "partial", retryAfterSec, ...(detail ? { detail } : {}) };
+  return { status: worst.status, retryAfterSec, ...(detail ? { detail } : {}) };
 }

@@ -100,7 +100,13 @@ interface ClubDetail {
 
 type Fetched<T> =
   | { ok: true; data: T }
-  | { ok: false; throttled: boolean; retryAfterSec?: number };
+  | { ok: false; throttled: boolean; retryAfterSec?: number; detail?: string };
+
+/** Log upstream failures without request data, so host-specific blocks show up in function logs. */
+function failure(kind: string, detail: string): { ok: false; throttled: false; detail: string } {
+  console.warn(JSON.stringify({ provider: "chronogolf", kind, detail }));
+  return { ok: false, throttled: false, detail };
+}
 
 /** While Chronogolf has asked us to back off, no request leaves this process. */
 let blockedUntil = 0;
@@ -132,6 +138,7 @@ async function request<T>(url: string, cache: { ttl: number } | "fresh"): Promis
     if (waitMs > 0) {
       return { ok: false, throttled: true, retryAfterSec: Math.ceil(waitMs / 1000) };
     }
+    const kind = new URL(url).pathname.split("/").pop() ?? "request";
     let res: Response;
     try {
       res = await fetch(url, {
@@ -141,8 +148,8 @@ async function request<T>(url: string, cache: { ttl: number } | "fresh"): Promis
           ? { cache: "no-store" as const }
           : { next: { revalidate: cache.ttl } }),
       });
-    } catch {
-      return { ok: false, throttled: false };
+    } catch (error) {
+      return failure(kind, error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 160) : "fetch failed");
     }
     if (res.status === 429) {
       const after = retryAfterSeconds(res.headers.get("retry-after")) ?? DEFAULT_BLOCK_S;
@@ -153,11 +160,11 @@ async function request<T>(url: string, cache: { ttl: number } | "fresh"): Promis
       blockedUntil = Date.now() + after * 1000;
       return { ok: false, throttled: true, retryAfterSec: after };
     }
-    if (!res.ok) return { ok: false, throttled: false };
+    if (!res.ok) return failure(kind, `http ${res.status}`);
     try {
       return { ok: true, data: (await res.json()) as T };
     } catch {
-      return { ok: false, throttled: false };
+      return failure(kind, `invalid json (${res.headers.get("content-type") ?? "no content-type"})`);
     }
   }
   return { ok: false, throttled: true, retryAfterSec: DEFAULT_BLOCK_S };
@@ -413,7 +420,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out;
 }
 
-type BatchOutcome = { rows: TeeTime[]; answered: boolean; throttled: boolean; retryAfterSec?: number };
+type BatchOutcome = { rows: TeeTime[]; answered: boolean; throttled: boolean; retryAfterSec?: number; detail?: string };
 
 async function fetchBatch(
   courseUuids: string[],
@@ -433,11 +440,11 @@ async function fetchBatch(
     );
     if (!res.ok) {
       // A failed later page still leaves the earlier pages' rows usable.
-      return { rows, answered: page > 1, throttled: res.throttled, retryAfterSec: res.retryAfterSec };
+      return { rows, answered: page > 1, throttled: res.throttled, retryAfterSec: res.retryAfterSec, detail: res.detail };
     }
     const data = res.data;
     if (data?.status !== "open" && data?.status !== "closed") {
-      return { rows, answered: page > 1, throttled: false };
+      return { rows, answered: page > 1, throttled: false, detail: `unexpected sheet status ${JSON.stringify(data?.status ?? null).slice(0, 40)}` };
     }
     rows.push(...parseBatchResponse(byCourseUuid, date, data));
     const count = Array.isArray(data.teetimes) ? data.teetimes.length : 0;
@@ -476,7 +483,7 @@ export async function fetchChronogolfWindow(
     for (const uuid of uuids) byCourseUuid.set(uuid, course);
   }
   const allUuids = [...byCourseUuid.keys()].sort();
-  if (allUuids.length === 0) return { rows: [], state: { status: "unavailable" } };
+  if (allUuids.length === 0) return { rows: [], state: { status: "unavailable", detail: "no course ids" } };
 
   const batches: string[][] = [];
   for (let i = 0; i < allUuids.length; i += BATCH_SIZE) batches.push(allUuids.slice(i, i + BATCH_SIZE));
@@ -505,6 +512,9 @@ export async function fetchChronogolfWindow(
   if (complete) state = { status: "ok" };
   else if (throttled) {
     state = { status: answered > 0 ? "partial" : "throttled", retryAfterSec: throttled.retryAfterSec };
-  } else state = { status: answered > 0 ? "partial" : "unavailable" };
+  } else {
+    const detail = outcomes.find((o) => o.detail)?.detail ?? (unresolved ? `${unresolved} clubs without course ids` : undefined);
+    state = { status: answered > 0 ? "partial" : "unavailable", ...(detail ? { detail } : {}) };
+  }
   return { rows, state };
 }

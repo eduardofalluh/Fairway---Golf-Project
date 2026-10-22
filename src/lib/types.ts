@@ -164,6 +164,8 @@ export type ProviderStatus = "ok" | "partial" | "throttled" | "unavailable";
 export interface ProviderState {
   status: ProviderStatus;
   retryAfterSec?: number;
+  /** Why a feed failed (e.g. "http 403", "timeout"), for diagnosing hosts. */
+  detail?: string;
 }
 
 export interface TeeTimePartResponse {
