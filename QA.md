@@ -1,30 +1,40 @@
-# Fairway verification — 2026-09-10
+# Fairway verification — 2026-10-22
+
+## Root cause of empty results
+
+Chronogolf's `/marketplace/v2/teetimes` returns HTTP 429 (`Retry-After: 60`)
+after roughly two dozen requests a minute. The previous search sent 50+ courses
+× up to 4 pages per search, so a second search came back empty and the error was
+swallowed. Measured locally: first search 69 slots / 9 courses in 6.2 s, repeat
+search 0 slots in 0.1 s with 20/20 probed calls rejected.
+
+## After the change
+
+- One ±1 hr Montréal search: 17 tee-sheet calls (324 slots), plus 3 one-off
+  club lookups on a cold start.
+- Shifting 13:00 → 14:00 fetched only 14:01–15:00 (4 parts); returning to
+  13:00 made 0 calls and rendered instantly.
+- A throttled search showed partial results with a banner and stopped further
+  provider calls; the booking sheet fell back to "Open Chronogolf anyway".
+- Verified booking: Golf l'Émeraude 1:00 PM re-checked live and linked to
+  `chronogolf.com/club/golf-l-emeraude?date=2026-10-23&nb_holes=18`.
 
 ## Automated checks
 
-- `npm test`: 19 passing tests covering search validation, date and time boundaries, capacity, holes, price and distance sorting, past inventory, estimates, provider URLs/capabilities, map slot consistency, region classification, and email failure handling.
-- `npm run lint`: passed.
-- `npm run build:next`: passed, including TypeScript.
-- Sites `build-site.mjs` / vinext production build: passed.
-- `git diff --check`: passed.
+- `npm test`: 39 passing (range validation, missing-range math, filters and
+  sorting, batching, 429 back-off, partial pages, CDN cache headers, verify and
+  email routes with server-side course lookup).
+- `npm run lint`, `tsc --noEmit`, `npm run build`: passed (Next.js 16.4.2).
+- `npm audit --omit=dev`: 0 vulnerabilities.
 
-## Interactive browser checks
+## Browser checks (local)
 
-Checked the deployed app and the updated local app in the Codex browser:
+Desktop and 375 px mobile: hero search, quick dates, nav search summary,
+filters drawer / bottom sheet, timeline, course cards, by-time list, map,
+booking sheet (dialog on desktop, draggable sheet on mobile), French copy.
 
-- Live search returned provider inventory; party size, holes, preferred time, region, and maximum price narrowed results. Inventory counts change as providers update their sheets.
-- A four-player, nine-hole Montréal Island search produced the matching available slot. Moving the time window produced the expected empty state.
-- Price sorting worked in both directions; map view loaded course markers and zoom controls.
-- Booking details preserved the selected round and searched party size, with an official provider link and an explicit statement that the round was not yet reserved. Escape closed the dialog.
-- GGGolf club selection changed the official destination; MinuteGolf sign-in used its official site.
-- Blocking the search endpoint produced a visible error with no stale booking buttons. Restoring the connection and retrying returned results.
-- Video pause stopped playback.
-- At a 390px mobile viewport, result cards initially overflowed horizontally. The fix was verified with equal document client and scroll widths (381px excluding the scrollbar).
+## Not checked
 
-## Bugs fixed during verification
-
-Empty provider sheets no longer become estimated availability. Results from other dates and malformed times/round lengths are rejected. Map price, time and holes now describe the same slot. Prices preserve cents, region matching handles local city spellings, failed searches clear previous results, and obsolete result cards no longer linger through exit animations. Malformed email requests return 400 and delivery failures return 503 without claiming success.
-
-## Scope limits
-
-No real reservation, payment, account login or outgoing email was performed. Email failure tests mock delivery. Provider-hosted sign-in and booking handoff are available; linked accounts and automatic checkout require provider integration access. Live inventory currently comes from Chronogolf; GGGolf and MinuteGolf destinations do not imply live inventory integration. Browser checks covered the main flows, not every device or possible provider failure.
+The deployed Netlify site (blocked by the browser policy used for testing),
+Netlify CDN caching behaviour, real email delivery, and Toronto/TeeTime live
+data in this session.

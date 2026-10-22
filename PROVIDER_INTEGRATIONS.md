@@ -77,23 +77,17 @@ verify external account sessions, or report a reservation as booked. The provide
 account buttons only open official pages; browser security prevents Fairway from
 reading the resulting provider session.
 
-After opening a provider login page, users can mark that provider as connected
-inside Fairway. That state is local to the user's browser: the sign-in button
-becomes a disabled connected button until the user disconnects it on that device.
-It is not provider-authenticated OAuth state.
+Picking a tee time opens a booking sheet that calls `POST /api/verify`. The
+server looks the course up in its own directory, re-reads that minute of the
+provider's live sheet without any cache, and only then returns the official deep
+link. If the slot changed it says so and offers no link; if the provider is busy
+it says it couldn't re-check and links to the provider page anyway. A "sign in
+first" link opens the provider's own login page; Fairway keeps no account state.
 
-When a provider is marked connected, matching tee-time cards change from a
-review/check action to a direct `Book with {Provider}` handoff. Central-provider
-connections apply provider-wide. GGGolf connections are scoped to the selected
-club portal, so connecting one GGGolf club only unlocks matching tee-sheet links
-for that club.
-
-The active `/api/autobook` route returns `501 Not Implemented`. It does not
-launch a browser or suggest that Fairway can complete a checkout. Tee-time detail
-email is considered sent only after the email service reports delivery.
-Production email requires `RESEND_API_KEY`; `BOOKING_FROM_EMAIL` should be a
-sender verified in that Resend account. Without that configuration the route
-returns `503` and the UI tells the golfer delivery failed.
+Tee-time detail email is considered sent only after the email service reports
+delivery. Production email requires `RESEND_API_KEY`; `BOOKING_FROM_EMAIL`
+should be a sender verified in that Resend account. Without that configuration
+the email option is hidden and the route returns `503`.
 
 ## What is required for account linking and one-click booking
 

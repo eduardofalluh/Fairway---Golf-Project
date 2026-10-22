@@ -6,28 +6,24 @@ fees in CAD, and continue to the course's booking provider.
 
 ## Current behavior
 
-- Cinematic course video with a pause control, reduced-motion support, and a
-  photo fallback; responsive search and course cards.
-- Montréal and Toronto/GTA are selectable markets. Each market has its own
-  regions, downtown-distance sorting, provider directory, and curated course
-  handoffs.
-- The search UI shows provider-confirmed Chronogolf/TeeTime availability only.
-  If a provider sheet is unavailable, closed, or the selected slot disappears,
-  Fairway shows no tee-time card instead of inventing a price.
-- Official Chronogolf, TeeTime, Golf the 6ix, GolfNow, MinuteGolf, and
-  club-specific GGGolf account access open on the provider's site. Fairway does
-  not receive passwords, inspect those browser sessions, or claim the accounts
-  are linked. Users can mark a provider as connected on their own device after
-  signing in, which changes the account card to a disabled connected state.
-- Connected providers unlock a guarded booking handoff on matching live tee-time
-  cards. Fairway re-checks the provider feed before opening checkout; if the
-  selected slot changed or disappeared, the handoff stops and the user searches
-  again. Chronogolf, TeeTime, Golf the 6ix, GolfNow, and MinuteGolf connections
-  apply provider-wide; GGGolf connections apply to the selected club portal. The
-  provider still confirms final price, payment, and the reservation. Fairway does
-  not store provider passwords or payment details.
-- Optional email is a selected-round reminder, never a booking confirmation.
-  The UI only reports delivery if the email service accepts it.
+- Search-first hero: pick Montréal or Toronto, a date, the hour you want to tee
+  off, how flexible you are, and the party size. Quick picks cover today,
+  tomorrow and the coming weekend. The search lives in the URL, so it can be
+  shared and the back button works.
+- Results arrive in four parallel parts and render as each lands. View them by
+  course (time chips per course, best match highlighted), by time, or on a map.
+  A timeline shows open slots per quarter hour; tap a bar to focus on it.
+- Sorting, price, holes, regions, public-only, cart and party size filter the
+  loaded slots in the browser, so they never trigger new provider calls.
+- Only provider-confirmed Chronogolf/TeeTime availability is shown. When a
+  provider throttles or fails, the page says so, keeps what it could read,
+  counts down the provider's `Retry-After`, and retries once.
+- Picking a time opens a booking sheet that re-checks that exact slot with the
+  provider, then links to the provider's page with the date and round length
+  filled in. Fairway never holds, books or pays for a slot.
+- Optional email (Resend) sends the details of a re-verified slot; it is hidden
+  when `RESEND_API_KEY` isn't configured and is never a booking confirmation.
+- English and French (Québec, 24-hour times); motion respects reduced-motion.
 
 See [PROVIDER_INTEGRATIONS.md](./PROVIDER_INTEGRATIONS.md) for verified provider
 links and the access needed to implement account linking and direct booking.
@@ -36,28 +32,29 @@ links and the access needed to implement account linking and direct booking.
 
 ```bash
 npm ci
-npm run dev           # original Next.js development server
-npm run dev:sites     # Cloudflare-compatible local development, port 5173
-npm test              # search validation, availability, prices, booking safety
+npm run dev           # Next.js development server
+npm test              # search, caching, rate-limit and booking-safety tests
 npm run lint
-npm run build         # Sites/Cloudflare Worker build through vinext
-npm start             # production preview
+npm run build         # production build (what Netlify runs)
+npm start             # serve the production build
 ```
 
-The original Next.js architecture and routes remain available:
-
-```bash
-npm run build:next
-npm run start:next
-```
-
-Sites hosting uses `.openai/hosting.json`, `vite.config.mts`, and the build output
-in `dist/`. Local `.env*` files are ignored and are never published as source.
-Configure production secrets in the hosting environment.
-
-Netlify hosting uses `netlify.toml`, builds with `npm run build:next`, and
-publishes the `.next` output through Netlify's managed Next.js runtime. Configure
+Netlify hosting uses `netlify.toml`, builds with `npm run build`, and publishes
+the `.next` output through Netlify's managed Next.js runtime. Configure
 production secrets in Netlify instead of committing local `.env*` files.
+
+## Staying inside provider rate limits
+
+Chronogolf answers bursts with HTTP 429 and `Retry-After: 60`; roughly two dozen
+tee-sheet requests a minute trip it. Fairway therefore:
+
+- asks only for the searched time range (`start_time`/`end_time`) and batches up
+  to 40 course ids per request, so a ±1 hr Montréal search costs about 15 calls;
+- caches complete answers for 90 s in Next's data cache and Netlify's CDN, so
+  identical searches from anyone are free;
+- remembers which minutes of a day the browser already loaded (3 min), so moving
+  the time window only fetches the new part and going back is instant;
+- stops calling a provider for as long as it asked after a 429.
 
 ## Data and configuration
 
@@ -86,20 +83,22 @@ Useful environment settings:
 - `CHRONOGOLF_TORONTO_RADIUS_KM=100`: Toronto-specific directory radius.
 - `RESEND_API_KEY`, `BOOKING_FROM_EMAIL`: optional email reminder delivery.
 
-The retained natural-language search endpoint is not exposed in the refreshed
-interface because it requires a separately configured AI service. No paid
-provider, email, or AI credentials are included in this deployment.
+No paid provider or email credentials are included in this deployment.
 
-## Search API
+## API
 
 ```text
-GET /api/tee-times?market=toronto&date=2026-09-12&time=13:00&window=60&players=2&holes=18&max=100&sort=price-asc
+GET  /api/courses?market=montreal
+GET  /api/tee-times?market=montreal&date=2026-10-23&start=12:00&end=14:00&part=0&parts=4
+POST /api/verify  {market, courseId, date, time, holes, players, price}
+POST /api/book    {email, market, courseId, date, time, holes, players, price}
 ```
 
-Returns `{ results, meta }`. Set `market=montreal` or `market=toronto`; omitted
-market defaults to Montréal. `live=0` is ignored for safety; public search stays
-provider-confirmed only. Invalid dates, times, player counts, market names,
-region names, sorting and price ranges return HTTP 400 before provider calls.
+`/api/tee-times` returns `{ teeTimes, providers, checkedCourses, … }` for one
+part of the market's live courses; ranges are capped at 6 hours and dates at 60
+days ahead. `/api/verify` and `/api/book` look the course up server-side and
+re-check the slot fresh before returning the official deep link. Invalid input
+returns HTTP 400 before any provider call.
 
 All prices and availability must be confirmed by the booking provider. Fairway is
 independent of every listed provider.
