@@ -6,10 +6,8 @@
   NODE_VERSION = "22"
   NEXT_TELEMETRY_DISABLED = "1"
 
-# Netlify CLI deploys need the generated Next server handler reachable for
-# App Router route handlers such as /api/tee-times.
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/___netlify-server-handler"
-  status = 200
-  force = false
+# The Next.js runtime turns the build into Netlify functions (API routes, ISR)
+# and routing. Without it Netlify uploads `.next` as static files and every
+# route 404s, which is what git-triggered builds did before this was declared.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
