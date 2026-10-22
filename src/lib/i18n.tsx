@@ -137,6 +137,10 @@ type Copy = {
     handoffBody: string;
     handoffBadge: string;
     openProvider: (name: string) => string;
+    seeLiveTimes: string;
+    widgetTitle: (course: string) => string;
+    widgetNote: string;
+    widgetClose: string;
     mapCaption: (count: number, hasUser: boolean) => string;
     loadingMap: string;
     live: string;
@@ -326,14 +330,18 @@ export const copy: Record<Language, Copy> = {
       providerName: { chronogolf: "Chronogolf", teetime: "TeeTime" },
       providerBusy: (p, s) => `${p} asked us to slow down${s ? ` — try again in about ${s}s` : ""}. Showing everything we could check.`,
       providerPartial: (p) => `Some ${p} courses didn't answer in time, so a few tee times may be missing.`,
-      providerDown: (p) => `${p} isn't answering right now.`,
+      providerDown: (p) => `${p} isn't sharing live times with this site right now. Each course below shows its live ${p} tee sheet.`,
       retry: "Retry",
       serviceError: "We couldn't reach the tee-time service. Check your connection and try again.",
       busyError: "You're searching faster than the tee sheets can keep up. Give it a few seconds.",
       handoffTitle: (n) => `${plural(n, "course", "courses")} you can book directly`,
-      handoffBody: "Live tee sheets are unreachable for these right now. Open the course's own booking page to see times.",
+      handoffBody: "Tap “See live times” for the course's live sheet right here, or open its booking page with your date already set.",
       handoffBadge: "Book on site",
       openProvider: (name) => `Open ${name}`,
+      seeLiveTimes: "See live times",
+      widgetTitle: (course) => `${course} · live tee times`,
+      widgetNote: "This is Chronogolf's own booking widget. Pick your date and time, then book with Chronogolf.",
+      widgetClose: "Close live times",
       mapCaption: (n, hasUser) =>
         `${plural(n, "course", "courses")} · ${hasUser ? "the blue dot is you" : "tap “Near me” to measure distance"}`,
       loadingMap: "Loading map…",
@@ -534,14 +542,18 @@ export const copy: Record<Language, Copy> = {
       providerName: { chronogolf: "Chronogolf", teetime: "TeeTime" },
       providerBusy: (p, s) => `${p} nous demande de ralentir${s ? ` — réessayez dans environ ${s} s` : ""}. Voici tout ce qu’on a pu vérifier.`,
       providerPartial: (p) => `Certains parcours ${p} n’ont pas répondu à temps; quelques départs peuvent manquer.`,
-      providerDown: (p) => `${p} ne répond pas pour le moment.`,
+      providerDown: (p) => `${p} ne partage pas ses départs en direct avec ce site pour le moment. Chaque parcours ci-dessous affiche sa feuille ${p} en direct.`,
       retry: "Réessayer",
       serviceError: "Impossible de joindre le service de départs. Vérifiez votre connexion et réessayez.",
       busyError: "Vous cherchez plus vite que les feuilles de départ peuvent suivre. Patientez quelques secondes.",
       handoffTitle: (n) => `${plural(n, "parcours", "parcours")} à réserver directement`,
-      handoffBody: "Leurs feuilles en direct sont inaccessibles pour l’instant. Ouvrez la page de réservation du parcours pour voir les heures.",
+      handoffBody: "Touchez « Voir les départs » pour la feuille en direct du parcours ici même, ou ouvrez sa page de réservation avec votre date déjà choisie.",
       handoffBadge: "Réserver sur le site",
       openProvider: (name) => `Ouvrir ${name}`,
+      seeLiveTimes: "Voir les départs",
+      widgetTitle: (course) => `${course} · départs en direct`,
+      widgetNote: "Voici le widget de réservation de Chronogolf. Choisissez la date et l’heure, puis réservez avec Chronogolf.",
+      widgetClose: "Fermer les départs",
       mapCaption: (n, hasUser) =>
         `${plural(n, "parcours", "parcours")} · ${hasUser ? "le point bleu, c’est vous" : "touchez « Près de moi » pour mesurer la distance"}`,
       loadingMap: "Chargement de la carte…",

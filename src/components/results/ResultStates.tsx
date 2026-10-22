@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowUpRight, CalendarPlus, Flag, MoveHorizontal, RotateCw, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarPlus, Flag, MoveHorizontal, RotateCw, Timer, X } from "lucide-react";
 import { addDaysISO } from "@/lib/format";
+import { chronogolfWidgetUrl, deepBookingUrl } from "@/lib/booking-links";
 import { distanceFor } from "@/lib/results";
 import { activeFilterCount } from "@/lib/search-state";
 import { getBookingProvider, safeBookingUrl } from "@/lib/providers/config";
 import { useLanguage } from "@/lib/i18n";
-import type { ProviderId } from "@/lib/types";
+import type { GolfCourse, ProviderId } from "@/lib/types";
 import { useSearch } from "../search/SearchProvider";
 import { CourseImage } from "./CourseCard";
+import { Sheet } from "../ui/Sheet";
 
 /**
  * Honest notes when a provider throttled, partly answered, or is down. When the
@@ -135,13 +137,46 @@ export function EmptyState() {
   );
 }
 
+/** Chronogolf's own booking widget for one course, embedded in a sheet. */
+function LiveTimesSheet({ course, onClose }: { course: GolfCourse | null; onClose: () => void }) {
+  const { t } = useLanguage();
+  const widget = course ? chronogolfWidgetUrl(course) : null;
+  return (
+    <Sheet
+      open={Boolean(course && widget)}
+      onClose={onClose}
+      variant="dialog"
+      title={course ? t.results.widgetTitle(course.name) : ""}
+      titleId="live-times-title"
+      closeLabel={t.results.widgetClose}
+    >
+      <p className="mb-3 text-sm text-fog">{t.results.widgetNote}</p>
+      {widget && (
+        <iframe
+          src={widget}
+          title={course ? t.results.widgetTitle(course.name) : ""}
+          className="h-[65svh] w-full rounded-2xl border border-line bg-base"
+          referrerPolicy="strict-origin-when-cross-origin"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+        />
+      )}
+    </Sheet>
+  );
+}
+
 const HANDOFF_PAGE = 12;
 
-/** When live sheets can't be read, point golfers at each course's own booking page. */
+/**
+ * When live sheets can't be read from our server, every course still gets a
+ * way to see its times: Chronogolf's own widget (loaded in the golfer's
+ * browser), or the booking page with the date and round already set.
+ */
 export function HandoffList() {
-  const { directory, userLoc } = useSearch();
+  const { directory, userLoc, query, filters } = useSearch();
   const { t } = useLanguage();
   const [limit, setLimit] = useState(HANDOFF_PAGE);
+  const [liveCourse, setLiveCourse] = useState<GolfCourse | null>(null);
+  const holes = filters.holes === 9 ? 9 : 18;
   const courses = directory
     .filter((c) => safeBookingUrl(c.bookingUrl) && c.access !== "private")
     .sort((a, b) => distanceFor(a, userLoc) - distanceFor(b, userLoc));
@@ -153,6 +188,8 @@ export function HandoffList() {
       <ul className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
         {courses.slice(0, limit).map((course, i) => {
           const provider = getBookingProvider(course.bookingUrl);
+          const href = safeBookingUrl(query.date ? deepBookingUrl(course, query.date, holes) : course.bookingUrl);
+          const widget = chronogolfWidgetUrl(course);
           return (
             <motion.li
               key={course.id}
@@ -171,14 +208,29 @@ export function HandoffList() {
                   {t.results.handoffBadge}
                 </span>
               </div>
-              <a
-                href={safeBookingUrl(course.bookingUrl)!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-forest px-4 text-sm font-semibold text-white transition hover:bg-forest-soft sm:w-auto"
-              >
-                {t.results.openProvider(provider.id === "course" ? "" : provider.name).trim()} <ArrowUpRight aria-hidden size={15} />
-              </a>
+              <div className="flex w-full flex-col gap-2 min-[400px]:flex-row sm:w-auto">
+                {widget && (
+                  <button
+                    type="button"
+                    onClick={() => setLiveCourse(course)}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-forest px-4 text-sm font-semibold text-white transition hover:bg-forest-soft sm:flex-none"
+                  >
+                    <Timer aria-hidden size={15} /> {t.results.seeLiveTimes}
+                  </button>
+                )}
+                {href && (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition sm:flex-none ${
+                      widget ? "border border-forest/30 text-forest hover:bg-lime/20" : "bg-forest text-white hover:bg-forest-soft"
+                    }`}
+                  >
+                    {t.results.openProvider(provider.id === "course" ? "" : provider.name).trim()} <ArrowUpRight aria-hidden size={15} />
+                  </a>
+                )}
+              </div>
             </motion.li>
           );
         })}
@@ -194,6 +246,7 @@ export function HandoffList() {
           </button>
         </div>
       )}
+      <LiveTimesSheet course={liveCourse} onClose={() => setLiveCourse(null)} />
     </div>
   );
 }

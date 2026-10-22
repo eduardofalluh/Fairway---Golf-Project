@@ -14,9 +14,10 @@ npm run dev     # http://localhost:3000
 npm test        # node:test via tsx — must stay green
 npm run lint    # must report 0 problems
 npm run build   # the exact build Netlify runs
+npm run security  # secrets in files/bundle, committed .env, prod npm audit (run after build)
 ```
 
-Run all three (`test`, `lint`, `build`) before every commit.
+Run `test`, `lint`, `build` and `security` before every commit.
 
 ## Where things live
 
@@ -35,7 +36,7 @@ Run all three (`test`, `lint`, `build`) before every commit.
 2. **Fairway never books.** It re-checks the slot (`/api/verify`) and hands off to the provider with date and holes pre-filled. Copy says "Continue on {provider}", never "Book" for the final step, and never implies a reservation exists.
 3. **Sign-in is a reminder, not a session.** Fairway cannot see provider logins. Marks are the golfer's own note, stored with a timestamp, shown as "Marked signed in · when", and expire after 14 days.
 4. **Never handle provider credentials or cards.** No stored passwords, no automated checkout, no headless booking.
-5. **Respect provider defenses.** If a provider rate-limits (429) or blocks (403), surface it honestly and fall back to booking links. Do not rotate user agents, runtimes, IPs or TLS fingerprints, solve CAPTCHAs, or otherwise work around a block. The durable fix is a partner API.
+5. **Respect provider defenses.** If a provider rate-limits (429) or blocks (403), surface it honestly and fall back to what the provider sanctions: booking links with the date and round pre-set, and Chronogolf's official booking widget (served with `X-Frame-Options: ALLOWALL`), embedded so it runs in the golfer's browser. Do not rotate user agents, runtimes, IPs or TLS fingerprints, retry to land on an unblocked server, solve CAPTCHAs, or otherwise work around a block. The durable fix is a partner API.
 
 ## Provider budget (Chronogolf)
 
@@ -54,6 +55,15 @@ Chronogolf returns 429 with `Retry-After: 60` after roughly two dozen requests a
 - Secrets only via environment variables (Netlify UI / `.env.local`, which is git-ignored). Never log personal data such as emails; log provider failures with status only.
 - Test fixtures use made-up data and `example.com` addresses — no real people.
 - Add dependencies only with a reason, pin them, and keep `npm audit --omit=dev` clean of high/critical issues.
+
+## Security (keep every item true)
+
+- **Headers** live in `next.config.ts` (`securityHeaders`) and apply to every route: a CSP that only allows this origin plus `*.chronogolf.com` photos, OpenStreetMap tiles and the Chronogolf widget as the only frame, HSTS, `X-Frame-Options: DENY`, `nosniff`, a strict referrer policy, `Cross-Origin-Opener-Policy`, and a permissions policy allowing only geolocation. `poweredByHeader` stays off. If a feature needs a new external host (images, API, fonts), add exactly that host to the CSP and its test, never a wildcard like `https:`.
+- **POST routes** read their body only through `readJsonBody` (`src/lib/request-guard.ts`): JSON content type, same-origin `Origin`/`Sec-Fetch-Site`, 8 KB cap. This is the CSRF and abuse defence; don't bypass it with `request.json()`.
+- **Rate limits** use `clientIp`, which trusts Netlify's `x-nf-client-connection-ip` before the spoofable `X-Forwarded-For`. Every route that calls a provider or sends email is rate limited; email is limited per caller and per address.
+- **Outbound links** go through `safeBookingUrl` (HTTPS only) and open with `rel="noopener noreferrer"`. No `dangerouslySetInnerHTML`, `innerHTML` with data, `eval`, or `new Function`.
+- **Secrets** never in code, tests, logs or `NEXT_PUBLIC_*`. Test values must look fake (`test-only-…`, `example.com`). `npm run security` fails the check otherwise.
+- Every security fix gets a test in `tests/security.test.ts` that performs the attack.
 
 ## UI standards
 

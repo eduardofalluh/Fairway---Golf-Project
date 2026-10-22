@@ -386,3 +386,12 @@ test("Chronogolf's own demo listings never appear as courses", async () => {
     fake.restore();
   }
 });
+
+test('fallback links keep the date and round; the widget only exists for Chronogolf clubs', async () => {
+  const { chronogolfWidgetUrl, deepBookingUrl } = await import('../src/lib/booking-links');
+  const club = { ...course, chronogolfSlug: 'golf-l-emeraude' };
+  assert.equal(deepBookingUrl(club, '2099-07-10', 9), 'https://www.chronogolf.com/club/golf-l-emeraude?date=2099-07-10&nb_holes=9');
+  assert.equal(chronogolfWidgetUrl(club), 'https://www.chronogolf.com/club/golf-l-emeraude/widget?medium=widget&source=club');
+  assert.equal(chronogolfWidgetUrl({ ...club, source: 'extra' }), null);
+  assert.equal(chronogolfWidgetUrl({ ...club, chronogolfSlug: '../x?y' }), 'https://www.chronogolf.com/club/..%2Fx%3Fy/widget?medium=widget&source=club');
+});

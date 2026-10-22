@@ -2,6 +2,9 @@ import { EXTRA_COURSES } from "./courses";
 import { fetchChronogolfWindow, getChronogolfCourses } from "./providers/chronogolf";
 import { fetchTeeTimeWindow } from "./providers/teetime";
 import { parseTimeToMinutes } from "./format";
+import { deepBookingUrl } from "./booking-links";
+
+export { deepBookingUrl };
 import type { RangeQuery } from "./search-query";
 import type {
   GolfCourse,
@@ -12,27 +15,6 @@ import type {
   TeeTimePartResponse,
   WindowQuery,
 } from "./types";
-
-/**
- * Deep link straight to the course's booking page, pre-set to the chosen date
- * and round length so the golfer lands on their exact tee-off ready to book.
- * Chronogolf honours `?date=` and `?nb_holes=`. TeeTime honours `?date=`
- * on club pages. Other providers keep their official handoff URL.
- */
-export function deepBookingUrl(
-  course: GolfCourse,
-  date: string,
-  holes: number,
-): string {
-  if (course.source === "chronogolf" && course.chronogolfSlug) {
-    const nb = holes >= 18 ? 18 : holes;
-    return `https://www.chronogolf.com/club/${course.chronogolfSlug}?date=${date}&nb_holes=${nb}`;
-  }
-  if (course.source === "teetime" && course.teeTimeSlug) {
-    return `https://tee-time.com/clubs/${course.teeTimeSlug}?date=${date}`;
-  }
-  return course.bookingUrl;
-}
 
 const norm = (s: string) =>
   s
