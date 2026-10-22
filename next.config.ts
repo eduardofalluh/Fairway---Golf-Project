@@ -4,15 +4,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/",
+        // Brand media rarely changes; let browsers and the CDN keep it.
+        source: "/:file(hero\\.mp4|hero\\.jpg|cta\\.jpg|icon\\.svg)",
         headers: [
-          { key: "Cache-Control", value: "no-store, max-age=0" },
-        ],
-      },
-      {
-        source: "/:path((?!_next/static|_next/image|icon.svg|hero.jpg|golf.jpg|golf2.jpg|golf3.jpg|golf-hero-video.mp4).*)",
-        headers: [
-          { key: "Cache-Control", value: "no-store, max-age=0" },
+          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" },
         ],
       },
     ];
