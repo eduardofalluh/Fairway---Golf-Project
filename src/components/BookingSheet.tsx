@@ -271,7 +271,7 @@ export function BookingSheet() {
       title={tee?.course.name ?? ""}
       footer={
         tee ? (
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {check.state === "changed" ? (
               <button
                 type="button"
@@ -305,8 +305,8 @@ export function BookingSheet() {
       }
     >
       {tee && (
-        <div className="grid gap-5">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-2xl bg-base p-4">
+        <div className="grid grid-cols-1 gap-5">
+          <dl className="grid grid-cols-1 gap-x-4 gap-y-4 rounded-2xl bg-base p-4 min-[360px]:grid-cols-2">
             <div className="flex gap-2.5">
               <Calendar aria-hidden size={17} className="mt-0.5 shrink-0 text-forest" />
               <div className="min-w-0">

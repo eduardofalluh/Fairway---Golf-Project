@@ -11,11 +11,11 @@ export function HowItWorks() {
   return (
     <section id="how" className="border-y border-line bg-surface">
       <div className="mx-auto max-w-[1440px] px-5 py-20 sm:px-8 lg:px-10 lg:py-24">
-        <Reveal className="grid gap-5 lg:grid-cols-[.75fr_1.25fr] lg:items-end">
+        <Reveal className="grid grid-cols-1 gap-5 lg:grid-cols-[.75fr_1.25fr] lg:items-end">
           <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">{t.sections.howEyebrow}</p>
           <h2 className="whitespace-pre-line font-display text-5xl font-semibold leading-[.9] tracking-[-.035em] sm:text-6xl">{t.sections.howTitle}</h2>
         </Reveal>
-        <RevealGroup className="mt-14 grid border-y border-line md:grid-cols-3" stagger={0.07}>
+        <RevealGroup className="mt-14 grid grid-cols-1 border-y border-line md:grid-cols-3" stagger={0.07}>
           {t.sections.steps.map((step) => (
             <motion.article key={step.n} variants={revealItem} className="border-b border-line py-8 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0">
               <span className="text-[10px] font-bold tracking-[.2em] text-fog">{step.n}</span>
@@ -34,7 +34,7 @@ export function Faq() {
 
   return (
     <section id="faq" className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-      <Reveal className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+      <Reveal className="grid grid-cols-1 gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[.22em] text-fog">{t.sections.faqEyebrow}</p>
           <h2 className="mt-4 font-display text-5xl font-semibold leading-none tracking-[-.035em] sm:text-6xl">{t.sections.faqTitle}</h2>
@@ -43,7 +43,7 @@ export function Faq() {
           {t.sections.faqIntro}
         </p>
       </Reveal>
-      <RevealGroup className="mt-10 grid gap-3" stagger={0.06}>
+      <RevealGroup className="mt-10 grid grid-cols-1 gap-3" stagger={0.06}>
         {t.sections.faqs.map((faq, index) => (
           <motion.details
             key={faq.q}
@@ -79,9 +79,9 @@ export function Footer() {
 
   return (
     <footer className="bg-forest text-white">
-      <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-12 sm:px-8 md:grid-cols-3 md:items-end lg:px-10">
+      <div className="mx-auto grid max-w-[1440px] grid-cols-1 gap-10 px-5 py-12 sm:px-8 md:grid-cols-3 md:items-end lg:px-10">
         <div><div className="flex items-center gap-2.5 font-display text-2xl font-semibold"><span className="grid h-8 w-8 place-items-center rounded-full bg-lime text-forest"><Flag size={15} fill="currentColor" /></span>Fairway</div><p className="mt-3 max-w-xs text-sm leading-6 text-white/55">{t.sections.footerBody}</p></div>
-        <div className="flex gap-6 text-xs font-semibold uppercase tracking-[.14em] text-white/65 md:justify-center"><a href="#top" className="hover:text-lime">{t.sections.footerSearch}</a><a href="#accounts" className="hover:text-lime">{t.sections.footerAccounts}</a><a href="#how" className="hover:text-lime">{t.sections.footerHow}</a><a href="#faq" className="hover:text-lime">{t.sections.footerFaq}</a></div>
+        <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold uppercase tracking-[.14em] text-white/65 md:justify-center"><a href="#top" className="hover:text-lime">{t.sections.footerSearch}</a><a href="#accounts" className="hover:text-lime">{t.sections.footerAccounts}</a><a href="#how" className="hover:text-lime">{t.sections.footerHow}</a><a href="#faq" className="hover:text-lime">{t.sections.footerFaq}</a></div>
         <p className="text-xs text-white/45 md:text-right">© {new Date().getFullYear()} Fairway · {t.sections.footerNote}</p>
       </div>
     </footer>

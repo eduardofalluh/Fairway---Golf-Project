@@ -108,7 +108,7 @@ export function CourseCard({
       initial={{ opacity: 0, y: 22, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.55, delay: Math.min(index, 8) * 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className="group overflow-hidden rounded-[1.75rem] border border-line bg-surface shadow-[var(--shadow-soft)] transition-shadow duration-300 hover:shadow-[var(--shadow-lift)]"
+      className="group min-w-0 overflow-hidden rounded-[1.75rem] border border-line bg-surface shadow-[var(--shadow-soft)] transition-shadow duration-300 hover:shadow-[var(--shadow-lift)]"
     >
       <div className="flex gap-4 p-4 sm:p-5">
         <div className="relative size-[76px] shrink-0 overflow-hidden rounded-2xl bg-base-2 sm:size-24">

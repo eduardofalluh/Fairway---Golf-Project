@@ -128,7 +128,7 @@ export function FiltersSheet() {
         </div>
       }
     >
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <Section title={t.filters.yourRound}>
           <div className="mb-3">
             <MarketToggle tone="light" layoutId="market-pill-sheet" />
@@ -142,7 +142,7 @@ export function FiltersSheet() {
         </Section>
 
         <Section title={t.filters.refine}>
-          <div className="grid gap-5">
+          <div className="grid grid-cols-1 gap-5">
             <div>
               <p className="mb-2 text-sm font-medium text-cream">{t.filters.holes}</p>
               <Segmented

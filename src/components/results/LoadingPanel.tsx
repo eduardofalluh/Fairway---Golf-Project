@@ -74,7 +74,7 @@ export function LoadingPanel() {
           />
         </div>
       </div>
-      <div className="mt-4 grid gap-3">
+      <div className="mt-4 grid grid-cols-1 gap-3">
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex gap-4 rounded-[1.75rem] border border-line bg-surface p-5" style={{ opacity: 1 - i * 0.22 }}>
             <div className="shimmer size-20 shrink-0 rounded-2xl" />

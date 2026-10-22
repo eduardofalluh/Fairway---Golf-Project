@@ -16,7 +16,7 @@ export function TimeList({ results, onPick }: { results: TeeTimeResult[]; onPick
   const rows = results.slice(0, limit);
   return (
     <>
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {rows.map((r, i) => {
           const { main, suffix } = timeParts(r.time, lang);
           return (

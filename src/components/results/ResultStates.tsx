@@ -55,7 +55,7 @@ export function StatusBanners() {
 
   if (notes.length === 0) return null;
   return (
-    <div className="mt-6 grid gap-2" role="status">
+    <div className="mt-6 grid grid-cols-1 gap-2" role="status">
       {notes.map((note) => (
         <motion.div
           key={note.key}
@@ -150,7 +150,7 @@ export function HandoffList() {
     <div className="mt-8">
       <h3 className="font-display text-3xl font-semibold text-cream">{t.results.handoffTitle(courses.length)}</h3>
       <p className="mt-1 max-w-2xl text-sm text-fog">{t.results.handoffBody}</p>
-      <ul className="mt-5 grid gap-3 md:grid-cols-2">
+      <ul className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
         {courses.slice(0, limit).map((course, i) => {
           const provider = getBookingProvider(course.bookingUrl);
           return (
@@ -159,12 +159,12 @@ export function HandoffList() {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i % HANDOFF_PAGE, 8) * 0.04 }}
-              className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-4"
+              className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface p-4"
             >
               <div className="size-16 shrink-0 overflow-hidden rounded-xl bg-base-2">
                 <CourseImage src={course.photo} className="h-full w-full object-cover" />
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-40">
                 <p className="truncate font-semibold text-cream">{course.name}</p>
                 <p className="truncate text-xs text-fog">{course.city} · {Math.round(distanceFor(course, userLoc))} km</p>
                 <span className="mt-1 inline-block rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog">
@@ -175,7 +175,7 @@ export function HandoffList() {
                 href={safeBookingUrl(course.bookingUrl)!}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-forest px-4 text-sm font-semibold text-white transition hover:bg-forest-soft"
+                className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl bg-forest px-4 text-sm font-semibold text-white transition hover:bg-forest-soft sm:w-auto"
               >
                 {t.results.openProvider(provider.id === "course" ? "" : provider.name).trim()} <ArrowUpRight aria-hidden size={15} />
               </a>

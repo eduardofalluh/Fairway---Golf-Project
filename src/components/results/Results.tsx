@@ -179,7 +179,7 @@ export function Results() {
     body = (
       <div className="mt-6">
         <LayoutGroup>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {groups.slice(0, limit).map((group, i) => (
               <CourseCard
                 key={group.course.id}
@@ -216,7 +216,7 @@ export function Results() {
         {search.status === "done" ? t.results.announce(results.length, groups.length) : ""}
       </p>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.22em] text-fog">
             <span className="live-dot" aria-hidden /> {t.results.eyebrow}
           </p>

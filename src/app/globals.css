@@ -27,6 +27,9 @@
 
 html {
   scroll-behavior: smooth;
+  /* Safety net: nothing may make phones scroll sideways. `clip` (unlike
+     `hidden`) creates no scroll container, so sticky/fixed UI keeps working. */
+  overflow-x: clip;
   background: var(--color-base);
   color: var(--color-cream);
   -webkit-font-smoothing: antialiased;
@@ -34,6 +37,7 @@ html {
 
 body {
   min-height: 100%;
+  overflow-x: clip;
   background:
     radial-gradient(900px 480px at 100% 26%, rgba(202, 236, 85, 0.08), transparent 62%),
     var(--color-base);

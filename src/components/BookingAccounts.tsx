@@ -58,7 +58,7 @@ function ProviderCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.5, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className={`flex flex-col rounded-[1.5rem] border p-5 transition-colors duration-300 sm:p-6 ${
+      className={`flex min-w-0 flex-col rounded-[1.5rem] border p-5 transition-colors duration-300 sm:p-6 ${
         connected ? "border-forest/35 bg-lime/15" : "border-line bg-base/50 hover:border-forest/30"
       }`}
     >
@@ -191,7 +191,7 @@ export function BookingAccounts() {
   return (
     <section id="accounts" aria-labelledby="accounts-title" className="border-y border-line bg-surface">
       <div className="mx-auto max-w-[1440px] px-4 py-16 sm:px-8 lg:px-10 lg:py-20">
-        <Reveal className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+        <Reveal className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.22em] text-fog">
               <KeyRound aria-hidden size={13} /> {t.accounts.eyebrow}
@@ -215,7 +215,7 @@ export function BookingAccounts() {
           </motion.p>
         </Reveal>
 
-        <div className="mt-10 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+        <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           {PROVIDER_ACCOUNT_LINKS.map((provider, i) => (
             <ProviderCard key={provider.id} id={provider.id} name={provider.name} defaultHref={provider.href} index={i} />
           ))}
