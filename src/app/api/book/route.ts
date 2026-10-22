@@ -3,10 +3,14 @@ import { formatPrice, formatTime12 } from "@/lib/format";
 import { readSlotRequest, verifyLiveTeeTime } from "@/lib/live-verification";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { emailConfigured } from "@/lib/email-config";
+import { readJsonBody } from "@/lib/request-guard";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Per address, and per caller across all addresses so the route can't be
+// used to spray emails at many inboxes.
 const emailLimiter = createRateLimiter(5, 15 * 60 * 1000);
+const callerLimiter = createRateLimiter(10, 60 * 60 * 1000);
 
 interface EmailDetails {
   course: string;
@@ -87,12 +91,9 @@ async function sendViaResend(to: string, html: string, b: EmailDetails): Promise
  * This never books anything; the provider confirms the reservation.
  */
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const read = await readJsonBody(request);
+  if (!read.ok) return read.response;
+  const body = read.body;
   const email = typeof (body as { email?: unknown })?.email === "string"
     ? ((body as { email: string }).email).trim()
     : "";
@@ -109,7 +110,8 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  if (emailLimiter(`${clientIp(request)}:${email.toLowerCase()}`).limited) {
+  const ip = clientIp(request);
+  if (callerLimiter(ip).limited || emailLimiter(`${ip}:${email.toLowerCase()}`).limited) {
     return NextResponse.json(
       { error: "Too many email requests. Please try again later." },
       { status: 429 },

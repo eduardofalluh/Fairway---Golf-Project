@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSlotRequest, verifyLiveTeeTime } from "@/lib/live-verification";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request-guard";
 
 const limiter = createRateLimiter(20, 60_000);
 
@@ -10,13 +11,9 @@ const limiter = createRateLimiter(20, 60_000);
  * or for a slot the provider was too busy to re-check.
  */
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
-  }
-  const slot = readSlotRequest(body);
+  const read = await readJsonBody(request);
+  if (!read.ok) return read.response;
+  const slot = readSlotRequest(read.body);
   if (!slot) {
     return NextResponse.json(
       { ok: false, error: "Only provider-confirmed live tee times can be prepared for booking." },

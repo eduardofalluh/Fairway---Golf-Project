@@ -18,7 +18,16 @@ export function createRateLimiter(limit: number, windowMs: number) {
   };
 }
 
+/**
+ * The caller's IP for rate limiting. Netlify's own header can't be forged by
+ * the client; X-Forwarded-For can (its first entry is whatever the caller
+ * sent), so it is only a fallback for local development.
+ */
 export function clientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return (forwarded || request.headers.get("x-nf-client-connection-ip") || request.headers.get("x-real-ip") || "unknown").slice(0, 64);
+  const ip =
+    request.headers.get("x-nf-client-connection-ip") ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+  return ip.slice(0, 64);
 }

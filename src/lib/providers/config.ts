@@ -242,9 +242,8 @@ export function getBookingProvider(bookingUrl: string): BookingProviderConfig {
 export function safeBookingUrl(bookingUrl: string): string | null {
   try {
     const url = new URL(bookingUrl);
-    return url.protocol === "https:" || url.protocol === "http:"
-      ? url.toString()
-      : null;
+    // HTTPS only: booking pages take logins and payments.
+    return url.protocol === "https:" ? url.toString() : null;
   } catch {
     return null;
   }

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test tests/*.test.ts",
+    "security": "node scripts/security-check.mjs",
     "agents:dashboard": "node tools/agent-dashboard/server.mjs"
   },
   "dependencies": {
