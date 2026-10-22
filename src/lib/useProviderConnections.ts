@@ -5,36 +5,39 @@ import type { BookingProviderId } from "@/lib/providers/config";
 import {
   CONNECTED_STORAGE_KEY,
   PROVIDER_CONNECTIONS_CHANGED,
+  addConnectionMarks,
+  connectionMarkedAt,
   countConnectedProviders,
-  hasProviderConnection,
+  parseConnectionMarks,
   providerConnectionKeys,
-  readConnectedProviderKeys,
-  writeConnectedProviderKeys,
+  readConnectionMarks,
+  writeConnectionMarks,
+  type ConnectionMark,
 } from "@/lib/provider-connections";
 
-function mergeKeys(current: string[], additions: string[]) {
-  return Array.from(new Set([...current, ...additions]));
-}
-
+/**
+ * Providers the golfer has marked as signed in on this device, with when they
+ * did it. These are reminders, not verified sessions, and expire after 14 days.
+ */
 export function useProviderConnections() {
-  const [connectedKeys, setConnectedKeys] = useState<string[]>([]);
-  const keysRef = useRef<string[]>([]);
+  const [marks, setMarks] = useState<ConnectionMark[]>([]);
+  const marksRef = useRef<ConnectionMark[]>([]);
   useEffect(() => {
-    keysRef.current = connectedKeys;
-  }, [connectedKeys]);
+    marksRef.current = marks;
+  }, [marks]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      setConnectedKeys(readConnectedProviderKeys());
+      setMarks(readConnectionMarks());
     });
     function onProviderChange(event: Event) {
-      const detail = (event as CustomEvent<string[]>).detail;
-      setConnectedKeys(Array.isArray(detail) ? detail : readConnectedProviderKeys());
+      const detail = (event as CustomEvent<unknown>).detail;
+      setMarks(Array.isArray(detail) ? parseConnectionMarks(detail) : readConnectionMarks());
     }
 
     function onStorage(event: StorageEvent) {
       if (event.key === CONNECTED_STORAGE_KEY) {
-        setConnectedKeys(readConnectedProviderKeys());
+        setMarks(readConnectionMarks());
       }
     }
 
@@ -51,10 +54,10 @@ export function useProviderConnections() {
   // updater, so no component updates while another one is rendering.
   const saveConnection = useCallback(
     (providerId: BookingProviderId, href?: string | null) => {
-      const next = mergeKeys(keysRef.current, providerConnectionKeys(providerId, href));
-      keysRef.current = next;
-      setConnectedKeys(next);
-      writeConnectedProviderKeys(next);
+      const next = addConnectionMarks(marksRef.current, providerConnectionKeys(providerId, href));
+      marksRef.current = next;
+      setMarks(next);
+      writeConnectionMarks(next);
     },
     [],
   );
@@ -62,27 +65,30 @@ export function useProviderConnections() {
   const removeConnection = useCallback(
     (providerId: BookingProviderId, href?: string | null) => {
       const removals = new Set(providerConnectionKeys(providerId, href));
-      const next = keysRef.current.filter((key) => !removals.has(key));
-      keysRef.current = next;
-      setConnectedKeys(next);
-      writeConnectedProviderKeys(next);
+      const next = marksRef.current.filter((mark) => !removals.has(mark.key));
+      marksRef.current = next;
+      setMarks(next);
+      writeConnectionMarks(next);
     },
     [],
   );
 
+  /** When this provider was marked signed in, or null if it isn't (or expired). */
+  const markedAt = useCallback(
+    (providerId: BookingProviderId, href?: string | null) => connectionMarkedAt(marks, providerId, href),
+    [marks],
+  );
+
   const isConnected = useCallback(
-    (providerId: BookingProviderId, href?: string | null) =>
-      hasProviderConnection(connectedKeys, providerId, href),
-    [connectedKeys],
+    (providerId: BookingProviderId, href?: string | null) => markedAt(providerId, href) != null,
+    [markedAt],
   );
 
   return {
-    connectedKeys,
-    connectedCount: useMemo(
-      () => countConnectedProviders(connectedKeys),
-      [connectedKeys],
-    ),
+    marks,
+    connectedCount: useMemo(() => countConnectedProviders(marks.map((m) => m.key)), [marks]),
     isConnected,
+    markedAt,
     saveConnection,
     removeConnection,
   };

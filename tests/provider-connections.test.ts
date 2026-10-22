@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  addConnectionMarks,
+  CONNECTION_TTL_MS,
+  connectionDaysLeft,
+  connectionMarkedAt,
   countConnectedProviders,
   hasProviderConnection,
   normalizeConnectedProviderKeys,
+  parseConnectionMarks,
   providerConnectionKey,
+  providerConnectionKeys,
 } from '../src/lib/provider-connections';
 import {
   buildFairwayConnectionReturnUrl,
@@ -83,4 +89,33 @@ test('provider return callback rejects unsafe or mismatched hrefs', () => {
 
   assert.equal(parseProviderConnectionCallback(unsafe), null);
   assert.equal(parseProviderConnectionCallback(mismatch), null);
+});
+
+test('sign-in marks are reminders that expire after 14 days', () => {
+  const now = Date.UTC(2026, 9, 22, 12);
+  const day = 86_400_000;
+  const marks = parseConnectionMarks([
+    { key: 'provider:chronogolf', at: now - 3 * day },
+    { key: 'provider:teetime', at: now - 15 * day },
+    { key: 'provider:golfnow', at: now + 2 * day },
+    'provider:minutegolf',
+    { key: 42, at: now },
+    null,
+  ], now);
+  assert.deepEqual(marks, [{ key: 'provider:chronogolf', at: now - 3 * day }]);
+  assert.equal(connectionMarkedAt(marks, 'chronogolf', 'https://www.chronogolf.com/club/x'), now - 3 * day);
+  assert.equal(connectionMarkedAt(marks, 'teetime', 'https://tee-time.com/clubs/x'), null);
+  assert.equal(connectionDaysLeft(now - 3 * day, now), 11);
+  assert.equal(connectionDaysLeft(now - CONNECTION_TTL_MS + 1000, now), 1);
+});
+
+test('marking again refreshes the time and keeps one entry per provider', () => {
+  const day = 86_400_000;
+  const first = addConnectionMarks([], providerConnectionKeys('chronogolf', 'https://www.chronogolf.com/login'), 1000);
+  assert.deepEqual(first, [{ key: 'provider:chronogolf', at: 1000 }]);
+  const again = addConnectionMarks(first, providerConnectionKeys('chronogolf', 'https://www.chronogolf.com/club/y'), 1000 + day);
+  assert.deepEqual(again, [{ key: 'provider:chronogolf', at: 1000 + day }]);
+  const club = addConnectionMarks(again, providerConnectionKeys('gggolf', 'https://secure.gggolf.ca/cerf/index.php'), 5000);
+  assert.equal(connectionMarkedAt(club, 'gggolf', 'https://secure.gggolf.ca/cerf/teesheet'), 5000);
+  assert.equal(connectionMarkedAt(club, 'gggolf', 'https://secure.gggolf.ca/atlantide/index.php'), null);
 });

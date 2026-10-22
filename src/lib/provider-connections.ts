@@ -85,27 +85,75 @@ export function countConnectedProviders(keys: string[]) {
   ).length;
 }
 
-export function readConnectedProviderKeys() {
-  if (typeof window === "undefined") return [] as string[];
+/** A golfer's own note that they signed in to a provider; Fairway can't verify it. */
+export interface ConnectionMark {
+  key: string;
+  /** When the golfer marked it (ms since epoch). */
+  at: number;
+}
+
+/** Provider sessions don't last forever, so a mark is only trusted for two weeks. */
+export const CONNECTION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Keep valid, unexpired marks. Entries saved before marks carried a time
+ * (plain strings) are dropped: nobody knows when they were confirmed.
+ */
+export function parseConnectionMarks(value: unknown, now = Date.now()): ConnectionMark[] {
+  if (!Array.isArray(value)) return [];
+  const marks = new Map<string, number>();
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const { key, at } = entry as Partial<ConnectionMark>;
+    if (typeof key !== "string" || !key || typeof at !== "number" || !Number.isFinite(at)) continue;
+    if (at > now + 60_000 || now - at > CONNECTION_TTL_MS) continue;
+    const [normalized] = normalizeConnectedProviderKeys([key]);
+    marks.set(normalized, Math.max(marks.get(normalized) ?? 0, at));
+  }
+  return [...marks].map(([key, at]) => ({ key, at }));
+}
+
+/** Whole days until a mark made at `at` expires (at least 1 while it is valid). */
+export function connectionDaysLeft(at: number, now = Date.now()): number {
+  return Math.max(1, Math.ceil((at + CONNECTION_TTL_MS - now) / 86_400_000));
+}
+
+/** Add or refresh marks for the given keys, all stamped `at`. */
+export function addConnectionMarks(marks: ConnectionMark[], keys: string[], at = Date.now()): ConnectionMark[] {
+  const next = new Map(marks.map((m) => [m.key, m.at]));
+  for (const key of normalizeConnectedProviderKeys(keys)) next.set(key, at);
+  return [...next].map(([key, markedAt]) => ({ key, at: markedAt }));
+}
+
+/** When the golfer last marked this provider (or club) signed in, if ever. */
+export function connectionMarkedAt(
+  marks: ConnectionMark[],
+  providerId: BookingProviderId,
+  href?: string | null,
+): number | null {
+  const wanted = new Set(normalizeConnectedProviderKeys(providerConnectionKeys(providerId, href)));
+  const times = marks.filter((m) => wanted.has(m.key)).map((m) => m.at);
+  return times.length ? Math.max(...times) : null;
+}
+
+export function readConnectionMarks(now = Date.now()): ConnectionMark[] {
+  if (typeof window === "undefined") return [];
   try {
     const saved = window.localStorage.getItem(CONNECTED_STORAGE_KEY);
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === "string")
-      : [];
+    return parseConnectionMarks(saved ? JSON.parse(saved) : [], now);
   } catch {
     return [];
   }
 }
 
-export function writeConnectedProviderKeys(keys: string[]) {
+export function writeConnectionMarks(marks: ConnectionMark[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage?.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(keys));
+    window.localStorage?.setItem(CONNECTED_STORAGE_KEY, JSON.stringify(marks));
   } catch {
     // Some privacy contexts disable localStorage. Components still keep state.
   }
   window.dispatchEvent(
-    new CustomEvent<string[]>(PROVIDER_CONNECTIONS_CHANGED, { detail: keys }),
+    new CustomEvent<ConnectionMark[]>(PROVIDER_CONNECTIONS_CHANGED, { detail: marks }),
   );
 }

@@ -49,6 +49,7 @@ type Copy = {
     confirm: string;
     confirmHint: (provider: string) => string;
     signedIn: string;
+    markedWhen: (ago: string, daysLeft: number) => string;
     forget: string;
     clubHelp: string;
     note: string;
@@ -161,9 +162,8 @@ type Copy = {
     openAnyway: (provider: string) => string;
     pickAnother: string;
     signInFirst: (provider: string) => string;
-    signedInHere: (provider: string) => string;
+    signedInHere: (provider: string, ago: string) => string;
     markSignedIn: string;
-    bookOn: (provider: string) => string;
     steps: { check: (date: string, time: string) => string; signIn: string; signedIn: string; confirm: string };
     noReservation: string;
     emailDetails: string;
@@ -206,13 +206,13 @@ export const copy: Record<Language, Copy> = {
       playVideo: "Play background video",
       pauseVideo: "Pause background video",
       videoUnsupported: "Your browser does not support background video.",
-      accounts: (n) => (n > 0 ? `Booking apps · ${n} signed in` : "Sign in to booking apps"),
+      accounts: (n) => (n > 0 ? `Booking apps · ${n} marked signed in` : "Sign in to booking apps"),
     },
     accounts: {
       eyebrow: "Book faster",
       title: "Sign in once.\nBook in a tap.",
-      body: "Sign in to the booking apps your courses use. Fairway remembers which ones you're signed in to on this device, so picking a tee time takes you straight to checkout.",
-      connectedCount: (n) => (n === 0 ? "None signed in yet" : `${plural(n, "app", "apps")} signed in on this device`),
+      body: "Sign in to the booking apps your courses use, then mark them here. Fairway can't see your logins, so it keeps a 14-day reminder on this device and shows it when you book.",
+      connectedCount: (n) => (n === 0 ? "None marked yet" : `${plural(n, "app", "apps")} marked signed in on this device`),
       scope: {
         chronogolf: "Québec + Ontario",
         teetime: "Toronto + GTA",
@@ -235,11 +235,12 @@ export const copy: Record<Language, Copy> = {
       yourClub: "Your club",
       pickClubFirst: "Pick your club to sign in",
       confirm: "I'm signed in",
-      confirmHint: (p) => `Signed in on ${p}? Confirm so Fairway can skip that step when you book.`,
-      signedIn: "Signed in",
+      confirmHint: (p) => `Finished signing in on ${p}? Mark it so Fairway reminds you at checkout.`,
+      signedIn: "Marked signed in",
+      markedWhen: (ago, days) => `Marked ${ago} · clears in ${plural(days, "day", "days")}`,
       forget: "Forget on this device",
       clubHelp: "Club not listed? Find its login",
-      note: "Sign-in happens on each provider's own site. Fairway never sees your password or card, and only remembers on this device that you signed in.",
+      note: "Sign-in happens on each provider's own site. Fairway never sees your password or card and can't check whether you're still logged in: a mark is only your reminder on this device, and it clears after 14 days.",
     },
     search: {
       label: "Search tee times",
@@ -359,13 +360,12 @@ export const copy: Record<Language, Copy> = {
       openAnyway: (p) => `Open ${p} anyway`,
       pickAnother: "Back to tee times",
       signInFirst: (p) => `Sign in on ${p} first`,
-      signedInHere: (p) => `Signed in to ${p} on this device`,
+      signedInHere: (p, ago) => `You marked ${p} signed in ${ago}`,
       markSignedIn: "I'm signed in",
-      bookOn: (p) => `Book on ${p}`,
       steps: {
         check: (date, time) => `Pick ${time} on ${date}`,
         signIn: "Sign in or check out as a guest",
-        signedIn: "You're already signed in — no login needed",
+        signedIn: "If you're still signed in there, go straight to checkout",
         confirm: "Confirm and pay with the course",
       },
       noReservation: "Fairway doesn't hold or book the slot. The course's confirmation is your booking.",
@@ -414,13 +414,13 @@ export const copy: Record<Language, Copy> = {
       playVideo: "Lire la vidéo d’arrière-plan",
       pauseVideo: "Mettre la vidéo en pause",
       videoUnsupported: "Votre navigateur ne prend pas en charge la vidéo d’arrière-plan.",
-      accounts: (n) => (n > 0 ? `Applis de réservation · ${n} connectée${n > 1 ? "s" : ""}` : "Se connecter aux applis de réservation"),
+      accounts: (n) => (n > 0 ? `Applis de réservation · ${n} marquée${n > 1 ? "s" : ""} comme connectée${n > 1 ? "s" : ""}` : "Se connecter aux applis de réservation"),
     },
     accounts: {
       eyebrow: "Réservez plus vite",
       title: "Connectez-vous une fois.\nRéservez en un geste.",
-      body: "Connectez-vous aux applis de réservation qu’utilisent vos parcours. Fairway retient sur cet appareil celles où vous êtes connecté, pour vous mener droit au paiement quand vous choisissez un départ.",
-      connectedCount: (n) => (n === 0 ? "Aucune connexion pour l’instant" : `${plural(n, "appli connectée", "applis connectées")} sur cet appareil`),
+      body: "Connectez-vous aux applis de réservation qu’utilisent vos parcours, puis marquez-les ici. Fairway ne voit pas vos connexions : il garde un rappel de 14 jours sur cet appareil et vous l’affiche au moment de réserver.",
+      connectedCount: (n) => (n === 0 ? "Aucune appli marquée pour l’instant" : `${plural(n, "appli marquée", "applis marquées")} comme connectée${n > 1 ? "s" : ""} sur cet appareil`),
       scope: {
         chronogolf: "Québec + Ontario",
         teetime: "Toronto + RGT",
@@ -443,11 +443,12 @@ export const copy: Record<Language, Copy> = {
       yourClub: "Votre club",
       pickClubFirst: "Choisissez votre club pour vous connecter",
       confirm: "Je suis connecté",
-      confirmHint: (p) => `Connecté sur ${p}? Confirmez pour que Fairway saute cette étape à la réservation.`,
-      signedIn: "Connecté",
+      confirmHint: (p) => `Connexion terminée sur ${p}? Marquez-la pour que Fairway vous le rappelle au paiement.`,
+      signedIn: "Marqué connecté",
+      markedWhen: (ago, days) => `Marqué ${ago} · expire dans ${plural(days, "jour", "jours")}`,
       forget: "Oublier sur cet appareil",
       clubHelp: "Club absent? Trouvez sa connexion",
-      note: "La connexion se fait sur le site de chaque fournisseur. Fairway ne voit jamais votre mot de passe ni votre carte et retient seulement, sur cet appareil, que vous êtes connecté.",
+      note: "La connexion se fait sur le site de chaque fournisseur. Fairway ne voit jamais votre mot de passe ni votre carte et ne peut pas vérifier si vous êtes encore connecté : un marquage n’est qu’un rappel sur cet appareil, effacé après 14 jours.",
     },
     search: {
       label: "Rechercher des départs",
@@ -567,13 +568,12 @@ export const copy: Record<Language, Copy> = {
       openAnyway: (p) => `Ouvrir ${p} quand même`,
       pickAnother: "Retour aux départs",
       signInFirst: (p) => `Se connecter sur ${p} d’abord`,
-      signedInHere: (p) => `Connecté à ${p} sur cet appareil`,
+      signedInHere: (p, ago) => `Vous avez marqué ${p} comme connecté ${ago}`,
       markSignedIn: "Je suis connecté",
-      bookOn: (p) => `Réserver sur ${p}`,
       steps: {
         check: (date, time) => `Choisissez ${time} le ${date}`,
         signIn: "Connectez-vous ou payez comme invité",
-        signedIn: "Vous êtes déjà connecté — aucune connexion requise",
+        signedIn: "Si vous y êtes encore connecté, passez directement au paiement",
         confirm: "Confirmez et payez auprès du parcours",
       },
       noReservation: "Fairway ne retient ni ne réserve le départ. La confirmation du parcours fait foi.",
@@ -681,4 +681,16 @@ export function timeParts(time: string, lang: Language): { main: string; suffix:
 export function formatTimeForLanguage(time: string, lang: Language) {
   const { main, suffix } = timeParts(time, lang);
   return suffix ? `${main} ${suffix}` : main;
+}
+
+/** "today", "yesterday", "3 days ago" (or French) for a past timestamp. */
+export function formatDaysAgo(at: number, lang: Language, now = Date.now()) {
+  const days = Math.max(0, Math.floor((startOfDay(now) - startOfDay(at)) / 86_400_000));
+  return new Intl.RelativeTimeFormat(lang === "fr" ? "fr-CA" : "en-CA", { numeric: "auto" }).format(-days, "day");
+}
+
+function startOfDay(ms: number) {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }

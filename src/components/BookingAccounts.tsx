@@ -16,7 +16,8 @@ import {
   providerLoginUrlWithReturn,
 } from "@/lib/provider-callback";
 import { useProviderConnections } from "@/lib/useProviderConnections";
-import { useLanguage } from "@/lib/i18n";
+import { connectionDaysLeft } from "@/lib/provider-connections";
+import { formatDaysAgo, useLanguage } from "@/lib/i18n";
 
 type ConnectableId = Exclude<BookingProviderId, "course">;
 
@@ -40,12 +41,14 @@ function ProviderCard({
   defaultHref: string;
   index: number;
 }) {
-  const { t } = useLanguage();
-  const { isConnected, saveConnection, removeConnection } = useProviderConnections();
+  const { t, lang } = useLanguage();
+  const { markedAt, saveConnection, removeConnection } = useProviderConnections();
   const [club, setClub] = useState("");
   const [opened, setOpened] = useState(false);
   const href = id === "gggolf" ? club || null : defaultHref;
-  const connected = href ? isConnected(id, href) : false;
+  const marked = href ? markedAt(id, href) : null;
+  const connected = marked != null;
+  const daysLeft = marked != null ? connectionDaysLeft(marked) : 0;
   const clubName = GGGOLF_CLUB_PORTALS.find((c) => c.href === club)?.name;
 
   return (
@@ -86,6 +89,9 @@ function ProviderCard({
       </div>
 
       <p className="mt-3 text-sm leading-6 text-fog">{t.accounts.description[id]}</p>
+      {marked != null && (
+        <p className="mt-2 text-xs font-semibold text-forest">{t.accounts.markedWhen(formatDaysAgo(marked, lang), daysLeft)}</p>
+      )}
 
       {id === "gggolf" && (
         <label className="mt-4 block">

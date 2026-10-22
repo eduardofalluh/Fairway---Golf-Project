@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowUpRight, Calendar, Check, Info, KeyRound, Mail, Map
 import { Sheet } from "./ui/Sheet";
 import { useSearch } from "./search/SearchProvider";
 import { formatPrice } from "@/lib/format";
-import { formatLongDateForLanguage, formatTimeForLanguage, timeParts, useLanguage } from "@/lib/i18n";
+import { formatDaysAgo, formatLongDateForLanguage, formatTimeForLanguage, timeParts, useLanguage } from "@/lib/i18n";
 import { getBookingProvider, PROVIDER_ACCOUNT_LINKS } from "@/lib/providers/config";
 import { useProfile } from "@/lib/useProfile";
 import { useProviderConnections } from "@/lib/useProviderConnections";
@@ -169,26 +169,29 @@ function EmailDetails({ tee, market }: { tee: TeeTimeResult; market: string }) {
   );
 }
 
-/** Signed-in state for this slot's provider, or a way to sign in without leaving. */
+/**
+ * The golfer's own sign-in reminder for this slot's provider (Fairway can't
+ * verify logins), or a way to sign in without leaving the sheet.
+ */
 function ProviderAccountRow({
   providerId,
   providerName,
   loginHref,
-  signedIn,
+  markedAt,
   onMarkSignedIn,
 }: {
   providerId: NonNullable<(typeof PROVIDER_ACCOUNT_LINKS)[number]["id"]>;
   providerName: string;
   loginHref: string;
-  signedIn: boolean;
+  markedAt: number | null;
   onMarkSignedIn: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [opened, setOpened] = useState(false);
-  if (signedIn) {
+  if (markedAt != null) {
     return (
-      <p className="inline-flex w-fit items-center gap-2 rounded-full bg-forest px-3 py-1.5 text-xs font-bold text-lime">
-        <Check aria-hidden size={14} /> {t.booking.signedInHere(providerName)}
+      <p className="inline-flex w-fit items-center gap-2 rounded-full border border-forest/25 bg-lime/20 px-3 py-1.5 text-xs font-semibold text-forest">
+        <Check aria-hidden size={14} /> {t.booking.signedInHere(providerName, formatDaysAgo(markedAt, lang))}
       </p>
     );
   }
@@ -226,12 +229,13 @@ export function BookingSheet() {
   const { booking: tee, closeBooking, query, emailEnabled } = useSearch();
   const { t, lang } = useLanguage();
   const check = useSlotCheck(tee, query.market);
-  const { isConnected, saveConnection } = useProviderConnections();
+  const { markedAt, saveConnection } = useProviderConnections();
 
   const provider = tee ? getBookingProvider(tee.bookingUrl) : null;
   const providerName = provider && provider.id !== "course" ? provider.name : tee?.course.name ?? "";
   const login = PROVIDER_ACCOUNT_LINKS.find((link) => link.id === provider?.id);
-  const signedIn = Boolean(tee && login && isConnected(login.id, tee.bookingUrl));
+  const markedSignedInAt = tee && login ? markedAt(login.id, tee.bookingUrl) : null;
+  const signedIn = markedSignedInAt != null;
   const time = tee ? timeParts(tee.time, lang) : null;
   const dateLabel = tee ? formatLongDateForLanguage(tee.date, lang) : "";
   const href = check.state === "verified" || check.state === "unverifiable" ? check.bookingUrl : null;
@@ -286,9 +290,7 @@ export function BookingSheet() {
                 whileTap={{ scale: 0.97 }}
                 className="shine flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-lime text-[15px] font-extrabold text-forest shadow-[0_12px_30px_rgba(202,236,85,.35)] transition-colors hover:bg-[#dcf887]"
               >
-                {check.state === "verified"
-                  ? signedIn ? t.booking.bookOn(providerName) : t.booking.continueOn(providerName)
-                  : t.booking.openAnyway(providerName)}
+                {check.state === "verified" ? t.booking.continueOn(providerName) : t.booking.openAnyway(providerName)}
                 <ArrowUpRight aria-hidden size={19} />
               </motion.a>
             ) : (
@@ -399,7 +401,7 @@ export function BookingSheet() {
               providerId={login.id}
               providerName={login.name}
               loginHref={login.href}
-              signedIn={signedIn}
+              markedAt={markedSignedInAt}
               onMarkSignedIn={() => saveConnection(login.id, tee.bookingUrl)}
             />
           )}
