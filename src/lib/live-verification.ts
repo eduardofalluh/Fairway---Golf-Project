@@ -1,105 +1,110 @@
-import { fetchCourseTeeTimes } from "./providers/chronogolf";
+import { deepBookingUrl, findCourse } from "./aggregator";
+import { fetchChronogolfWindow } from "./providers/chronogolf";
 import { fetchTeeTimeCourseTeeTimes } from "./providers/teetime";
-import { safeBookingUrl } from "./providers/config";
-import type { GolfCourse, TeeTimeResult } from "./types";
+import { parseTimeToMinutes } from "./format";
+import { isCalendarDate, isClockTime } from "./search-query";
+import { MARKET_IDS, type GolfCourse, type MarketId, type TeeTime } from "./types";
 
-export type LiveVerificationInput = Pick<
-  TeeTimeResult,
-  "date" | "time" | "holes" | "players" | "price" | "source" | "bookingUrl"
-> & {
-  course: GolfCourse;
-};
+export interface SlotRequest {
+  market: MarketId;
+  courseId: string;
+  date: string;
+  time: string;
+  holes: 9 | 18;
+  players: number;
+  price: number;
+}
 
 export type LiveVerificationResult =
-  | { ok: true; bookingUrl: string; price: number; time: string; note: string }
-  | { ok: false; reason: "not_live" | "invalid_link" | "unverifiable" | "changed"; note: string };
+  | { ok: true; course: GolfCourse; bookingUrl: string; price: number; time: string; note: string }
+  | {
+      ok: false;
+      reason: "invalid" | "not_found" | "unverifiable" | "changed";
+      note: string;
+      /** The official provider page, when it is still worth opening. */
+      bookingUrl?: string;
+    };
+
+/** Strictly read a slot request from an untrusted JSON body. */
+export function readSlotRequest(body: unknown): SlotRequest | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const b = body as Record<string, unknown>;
+  if (typeof b.market !== "string" || !MARKET_IDS.includes(b.market as MarketId)) return null;
+  if (typeof b.courseId !== "string" || b.courseId.length === 0 || b.courseId.length > 120) return null;
+  if (typeof b.date !== "string" || !isCalendarDate(b.date)) return null;
+  if (typeof b.time !== "string" || !isClockTime(b.time)) return null;
+  if (b.holes !== 9 && b.holes !== 18) return null;
+  if (typeof b.players !== "number" || !Number.isInteger(b.players) || b.players < 1 || b.players > 4) return null;
+  if (typeof b.price !== "number" || !Number.isFinite(b.price) || b.price <= 0 || b.price > 2000) return null;
+  return {
+    market: b.market as MarketId,
+    courseId: b.courseId,
+    date: b.date,
+    time: b.time,
+    holes: b.holes,
+    players: b.players,
+    price: b.price,
+  };
+}
 
 function sameCents(a: number, b: number) {
   return Math.round(a * 100) === Math.round(b * 100);
 }
 
-function officialBookingUrl(course: GolfCourse, date: string, holes: number): string | null {
-  if (course.source === "chronogolf" && course.chronogolfSlug) {
-    const nb = holes >= 18 ? 18 : 9;
-    return `https://www.chronogolf.com/club/${course.chronogolfSlug}?date=${date}&nb_holes=${nb}`;
-  }
-  if (course.source === "teetime" && course.teeTimeSlug) {
-    return `https://tee-time.com/clubs/${course.teeTimeSlug}?date=${date}`;
-  }
-  return null;
-}
-
 /**
  * Re-check one selected tee time against the provider's live feed immediately
- * before handoff. This prevents stale UI state from becoming a booking path.
+ * before handoff. The course is looked up server-side; nothing about the
+ * provider request comes from the browser except the slot being checked.
  */
-export async function verifyLiveTeeTime(
-  input: LiveVerificationInput,
-): Promise<LiveVerificationResult> {
-  if (input.source !== "live") {
-    return {
-      ok: false,
-      reason: "not_live",
-      note: "Fairway can only continue with provider-confirmed live tee times.",
-    };
+export async function verifyLiveTeeTime(slot: SlotRequest): Promise<LiveVerificationResult> {
+  const course = await findCourse(slot.market, slot.courseId);
+  if (!course || !course.online || !(course.chronogolfSlug || course.teeTimeSlug)) {
+    return { ok: false, reason: "not_found", note: "Fairway can only continue with provider-confirmed live tee times." };
   }
+  const bookingUrl = deepBookingUrl(course, slot.date, slot.holes);
+  const minutes = parseTimeToMinutes(slot.time);
 
-  if (!safeBookingUrl(input.bookingUrl)) {
-    return {
-      ok: false,
-      reason: "invalid_link",
-      note: "This tee time does not have a valid provider booking link.",
-    };
-  }
-
-  const safeUrl = officialBookingUrl(input.course, input.date, input.holes);
-  if (!safeUrl) {
-    return {
-      ok: false,
-      reason: "invalid_link",
-      note: "This tee time does not have a valid provider booking link.",
-    };
-  }
-
-  const course = input.course;
-  let rows = null;
+  let rows: TeeTime[] | null = null;
   if (course.source === "chronogolf") {
-    rows = await fetchCourseTeeTimes(course, input.date);
+    const sheet = await fetchChronogolfWindow([course], slot.date, minutes, minutes, { fresh: true });
+    rows = sheet.state.status === "ok" ? sheet.rows : null;
   } else if (course.source === "teetime") {
-    rows = await fetchTeeTimeCourseTeeTimes(course, input.date);
+    rows = await fetchTeeTimeCourseTeeTimes(course, slot.date, { fresh: true });
   }
 
   if (!rows) {
     return {
       ok: false,
       reason: "unverifiable",
-      note: "Fairway could not verify this slot with the provider right now. Please check the provider page directly.",
+      bookingUrl,
+      note: "The provider is busy, so Fairway couldn't re-check this slot. Its booking page shows the current availability.",
     };
   }
 
   const match = rows.find(
     (row) =>
       row.source === "live" &&
-      row.date === input.date &&
-      row.time === input.time &&
-      row.holes === input.holes &&
-      row.players >= input.players &&
-      sameCents(row.price, input.price),
+      row.date === slot.date &&
+      row.time === slot.time &&
+      row.holes === slot.holes &&
+      row.players >= slot.players &&
+      sameCents(row.price, slot.price),
   );
 
   if (!match) {
     return {
       ok: false,
       reason: "changed",
-      note: "That tee time changed or disappeared on the provider's live sheet. Search again before booking.",
+      note: "That tee time changed or was just taken on the provider's live sheet. Pick another time.",
     };
   }
 
   return {
     ok: true,
-    bookingUrl: safeUrl,
+    course,
+    bookingUrl,
     price: match.price,
     time: match.time,
-    note: "Verified live with the provider. Continue there to finish the reservation and payment.",
+    note: "Verified live with the provider. Finish the reservation and payment there.",
   };
 }

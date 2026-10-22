@@ -111,20 +111,69 @@ export interface TeeTimeResult extends TeeTime {
   deltaMinutes: number;
 }
 
-export interface SearchQuery {
+export type SortKey =
+  | "closest-time"
+  | "price-asc"
+  | "price-desc"
+  | "closest-price"
+  | "distance";
+
+export const SORT_KEYS: SortKey[] = [
+  "closest-time",
+  "price-asc",
+  "price-desc",
+  "closest-price",
+  "distance",
+];
+
+/**
+ * What the server fetches from providers. Everything else is a client-side
+ * filter, so identical windows share one cached upstream fetch.
+ */
+export interface WindowQuery {
+  market: MarketId;
   date: string; // YYYY-MM-DD
   desiredTime: string; // HH:MM
   windowMinutes: number;
+}
+
+/** Filters applied in the browser to an already-fetched window. */
+export interface SearchFilters {
   players: number;
-  holes?: 9 | 18 | "any";
-  market?: MarketId;
+  holes: 9 | 18 | "any";
   targetPrice?: number;
-  maxPrice?: number;
   minPrice?: number;
-  regions?: Region[];
+  maxPrice?: number;
+  regions: Region[];
   maxDistanceKm?: number;
-  cartOnly?: boolean;
-  liveOnly?: boolean;
-  publicOnly?: boolean;
-  sort?: "price-desc" | "price-asc" | "closest-time" | "closest-price" | "distance";
+  cartOnly: boolean;
+  publicOnly: boolean;
+  sort: SortKey;
+  /** Optional [start, end] minutes slice picked on the timeline. */
+  slice?: [number, number];
+}
+
+export type ProviderId = "chronogolf" | "teetime";
+
+/**
+ * ok = every sheet answered; partial = some sheets answered; throttled = the
+ * provider asked us to slow down; unavailable = no sheet could be read.
+ */
+export type ProviderStatus = "ok" | "partial" | "throttled" | "unavailable";
+
+export interface ProviderState {
+  status: ProviderStatus;
+  retryAfterSec?: number;
+}
+
+export interface TeeTimePartResponse {
+  market: MarketId;
+  date: string;
+  startMin: number;
+  endMin: number;
+  part: number;
+  parts: number;
+  checkedCourses: number;
+  teeTimes: TeeTime[];
+  providers: Partial<Record<ProviderId, ProviderState>>;
 }

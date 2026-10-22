@@ -1,14 +1,17 @@
 import { Nav } from "@/components/Nav";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { Hero, CourseMarquee } from "@/components/Hero";
-import { TeeFinder } from "@/components/TeeFinder";
-import { ProviderAccounts } from "@/components/ProviderAccounts";
+import { SearchProvider } from "@/components/search/SearchProvider";
+import { FiltersSheet } from "@/components/search/FiltersSheet";
+import { Results } from "@/components/results/Results";
+import { BookingSheet } from "@/components/BookingSheet";
 import { HowItWorks, Faq, Footer } from "@/components/Sections";
 import { getDirectory } from "@/lib/aggregator";
+import { emailConfigured } from "@/lib/email-config";
 
-// Keep the app shell fresh so mobile browsers and Netlify do not retain old UI copy.
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// The shell is prerendered and refreshed every 6 hours; tee times load live in
+// the browser, so the page never waits on providers.
+export const revalidate = 21600;
 
 export default async function Home() {
   const [montrealCourses, torontoCourses] = await Promise.all([
@@ -16,21 +19,22 @@ export default async function Home() {
     getDirectory("toronto"),
   ]);
   const courses = [...montrealCourses, ...torontoCourses];
-  const names = courses.map((c) => c.name);
+  const names = courses.filter((c) => c.online).map((c) => c.name);
 
   return (
-    <>
+    <SearchProvider emailEnabled={emailConfigured()}>
       <ScrollProgress />
       <Nav />
       <main>
         <Hero courseCount={courses.length} />
         <CourseMarquee names={names} />
-        <ProviderAccounts />
-        <TeeFinder />
+        <Results />
         <HowItWorks />
         <Faq />
       </main>
       <Footer />
-    </>
+      <FiltersSheet />
+      <BookingSheet />
+    </SearchProvider>
   );
 }

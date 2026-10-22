@@ -8,752 +8,502 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { BookingProviderId } from "@/lib/providers/config";
-import type { MarketId } from "@/lib/types";
+import type { MarketId, ProviderId, SortKey } from "@/lib/types";
 
 export type Language = "en" | "fr";
-
-type ProviderCopy = {
-  action: string;
-  description: string;
-};
 
 type Copy = {
   langName: string;
   toggleLabel: string;
   nav: {
-    accounts: string;
     teeTimes: string;
     how: string;
     faq: string;
-    search: string;
+    find: string;
+    home: string;
   };
   hero: {
-    eyebrow: (marketCount: number, courseCount: number) => string;
+    eyebrow: (courseCount: number) => string;
     title1: string;
     title2: string;
-    explore: string;
-    connect: string;
     body: string;
-    trustTitle: string;
-    marketStat: string;
-    marketValue: (count: number) => string;
-    courseStat: string;
-    courseValue: (count: number) => string;
-    verifiedStat: string;
-    verifiedValue: string;
-    trustBody: string;
     playVideo: string;
     pauseVideo: string;
     videoUnsupported: string;
   };
-  accounts: {
-    eyebrow: string;
-    title: string;
-    body: string;
-    stats: {
-      chronogolf: string;
-      teetime: string;
-      toronto: string;
-      connected: string;
-      active: (count: number) => string;
-    };
-    providerHosted: string;
-    connectedStatus: string;
-    yourClub: string;
-    chooseClub: (count: number) => string;
-    signInClub: (clubName: string) => string;
-    connected: string;
-    chooseClubToSignIn: string;
-    loggedIn: string;
-    disconnect: string;
-    clubHelp: string;
-    markedConnected: (providerName: string) => string;
-    confirmSignedIn: (providerName: string) => string;
-    opensLogin: string;
-    gggolfClubAccess: string;
-    note: string;
-    provider: Partial<Record<BookingProviderId, ProviderCopy>>;
-  };
   search: {
-    loadingMap: string;
-    eyebrow: (area: string) => string;
-    title: string;
-    body: string;
-    marketArea: Record<MarketId, string>;
-    availabilityTitle: string;
-    liveOnlyBody: string;
-    liveOnly: string;
+    label: string;
+    markets: Record<MarketId, { label: string; short: string }>;
     date: string;
-    preferredTime: string;
+    time: string;
+    flex: string;
     players: string;
-    flexibleBy: string;
+    find: string;
+    finding: string;
+    flexValue: (minutes: number) => string;
+    playersValue: (count: number) => string;
+    quickDates: { today: string; tomorrow: string; saturday: string; sunday: string };
+    editSearch: string;
+    filters: string;
+    morePlayers: string;
+    fewerPlayers: string;
+  };
+  filters: {
+    title: string;
+    yourRound: string;
+    refine: string;
     holes: string;
     any: string;
-    holesValue: (holes: string | number) => string;
+    holesValue: (holes: number) => string;
+    maxPrice: string;
     targetBudget: string;
-    hardCeiling: string;
+    targetHint: string;
     regions: string;
-    publicOnly: string;
     allRegions: string;
-    loadingButton: string;
-    submit: string;
-    updating: string;
-    resultHeading: (total: number, courses: number) => string;
-    rangeFrom: (liveRows: number) => string;
-    resultSummary: (liveRows: number, total: number) => string;
-    noResultsMeta: string;
-    locationUnavailable: string;
-    locationError: string;
-    serviceError: string;
-    genericError: string;
-    useLocationTitle: string;
+    publicOnly: string;
+    cartOnly: string;
+    reset: string;
+    show: (count: number) => string;
+    close: string;
+  };
+  results: {
+    eyebrow: string;
+    checking: (courses: number) => string;
+    checkingCourse: string;
+    foundSoFar: (count: number) => string;
+    heading: (count: number) => string;
+    acrossCourses: (courses: number) => string;
+    windowSummary: (date: string, start: string, end: string) => string;
+    views: { course: string; time: string; map: string };
+    viewsLabel: string;
+    sort: string;
+    sortLabels: Record<SortKey, string>;
+    nearMe: string;
     locating: string;
     usingLocation: string;
-    useLocation: string;
-    list: string;
-    map: string;
-    change: string;
-    sort: string;
-    sortLabels: Record<string, string>;
-    closest: string;
-    liveNow: string;
-    sortNearest: string;
-    noMatches: () => string;
-    courseFallbackHeading: (count: number) => string;
-    courseFallbackBody: string;
-    courseFallbackCardNote: string;
-    providerHandoffBadge: string;
-    openProvider: (provider: string) => string;
-    mapCaption: (count: number, hasUser: boolean) => string;
-    liveLegend: string;
-    showingTop: (shown: number, total: number) => string;
-    confirmedTitle: string;
-    estimatedTitle: string;
-    unavailableTitle: string;
-    liveBadge: string;
-    estimateBadge: string;
-    unavailableBadge: string;
-    connectedBadge: string;
-    distanceFromYou: (km: number, minutes: number) => string;
-    cart: string;
-    onBudget: string;
+    locationError: string;
+    locationUnavailable: string;
+    timelineLabel: string;
+    timelineHint: string;
+    allTimes: string;
+    bucketLabel: (count: number, time: string) => string;
+    from: string;
     perPlayer: string;
-    spotsOpen: (spots: number) => string;
-    estimatedPerPlayer: string;
-    unavailablePerPlayer: string;
-    unavailable: string;
-    bookWithConnected: (course: string, provider: string) => string;
-    openDetails: (course: string) => string;
-    bookWith: (provider: string) => string;
-    review: string;
-    check: string;
+    spots: (count: number) => string;
+    cart: string;
+    holes: (count: number) => string;
+    moreTimes: (count: number) => string;
+    fewerTimes: string;
+    bestMatch: string;
+    onBudget: string;
+    distance: (km: number, minutes: number | null) => string;
+    showMore: (count: number) => string;
+    emptyTitle: string;
+    emptyBody: string;
+    tryWider: string;
+    tryTomorrow: string;
+    clearFilters: string;
+    providerName: Record<ProviderId, string>;
+    providerBusy: (provider: string, seconds?: number) => string;
+    providerPartial: (provider: string) => string;
+    providerDown: (provider: string) => string;
+    retry: string;
+    serviceError: string;
+    busyError: string;
+    handoffTitle: (count: number) => string;
+    handoffBody: string;
+    handoffBadge: string;
+    openProvider: (name: string) => string;
+    mapCaption: (count: number, hasUser: boolean) => string;
+    loadingMap: string;
+    live: string;
+    openDetails: (course: string, time: string) => string;
+    announce: (count: number, courses: number) => string;
   };
   booking: {
-    invalidEmail: string;
-    emailFailed: string;
-    emailTryAgain: string;
-    srDescription: string;
     close: string;
-    available: string;
-    estimated: string;
+    srDescription: string;
     live: string;
-    est: string;
     date: string;
-    teeTime: string;
     where: string;
     round: string;
     greenFee: string;
-    unavailableFee: string;
     players: (count: number) => string;
     holes: (count: number) => string;
-    liveIntro: string;
-    estimateIntro: string;
-    connectedIntro: (provider: string) => string;
-    contextualIntro: string;
-    checkIntro: string;
-    providerConfirms: string;
-    verifyingProvider: string;
-    verificationFailed: string;
-    invalidLink: string;
-    bookWith: (provider: string) => string;
+    checking: (provider: string) => string;
+    verified: string;
+    verifiedNote: string;
+    changed: string;
+    unverifiable: string;
     continueOn: (provider: string) => string;
-    opened: (provider: string) => string;
-    checkStep: (date: string, time: string) => string;
-    connectedStep: string;
-    signInStep: string;
-    confirmStep: string;
+    openAnyway: (provider: string) => string;
+    pickAnother: string;
+    signInFirst: (provider: string) => string;
+    steps: { check: (date: string, time: string) => string; signIn: string; confirm: string };
     noReservation: string;
-    reopen: (provider: string) => string;
-    sent: (email: string) => string;
     emailDetails: string;
     emailLabel: string;
-    sending: string;
     send: string;
-  };
-  features: {
-    imageAlt: string;
-    imageEyebrow: string;
-    imageTitle: string;
-    eyebrow: string;
-    title: string;
-    items: Array<{ title: string; body: string }>;
+    sending: string;
+    sent: (email: string) => string;
+    invalidEmail: string;
+    emailFailed: string;
   };
   sections: {
     howEyebrow: string;
     howTitle: string;
     steps: Array<{ n: string; title: string; body: string }>;
-    ctaAlt: string;
-    ctaEyebrow: string;
-    ctaTitle: string;
-    ctaButton: string;
     faqEyebrow: string;
     faqTitle: string;
     faqIntro: string;
     faqs: Array<{ q: string; a: string }>;
     footerBody: string;
     footerSearch: string;
-    footerAccounts: string;
+    footerHow: string;
     footerFaq: string;
     footerNote: string;
   };
 };
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 export const copy: Record<Language, Copy> = {
   en: {
     langName: "English",
     toggleLabel: "Language",
-    nav: {
-      accounts: "Accounts",
-      teeTimes: "Tee times",
-      how: "How it works",
-      faq: "FAQ",
-      search: "Search",
-    },
+    nav: { teeTimes: "Tee times", how: "How it works", faq: "FAQ", find: "Find a tee time", home: "Fairway home" },
     hero: {
-      eyebrow: (marketCount, courseCount) =>
-        `Montréal + Toronto · ${marketCount} markets · ${courseCount} courses tracked`,
+      eyebrow: (count) => (count > 0 ? `Montréal + Toronto · ${count} courses, one search` : "Montréal + Toronto · one search"),
       title1: "Find your round.",
       title2: "We'll line it up.",
-      explore: "Explore tee times",
-      connect: "Connect accounts",
-      body: "Compare nearby courses and green fees. Find a time that fits.",
-      trustTitle: "Ready before checkout",
-      marketStat: "Markets",
-      marketValue: (count) => `${count} live areas`,
-      courseStat: "Courses",
-      courseValue: (count) => `${count} tracked`,
-      verifiedStat: "Before handoff",
-      verifiedValue: "Re-check live slot",
-      trustBody: "Fairway opens the review sheet first, then re-checks the provider before handoff.",
+      body: "Pick a day and the hour you want to tee off. Fairway checks live tee sheets across the region and shows every open slot around it.",
       playVideo: "Play background video",
       pauseVideo: "Pause background video",
       videoUnsupported: "Your browser does not support background video.",
     },
-    accounts: {
-      eyebrow: "Start here",
-      title: "Connect your booking accounts first.",
-      body: "Open Chronogolf, TeeTime, Golf the 6ix, MinuteGolf, GolfNow, or your club's GGGolf sign-in page before you compare tee times. Fairway keeps the search in one place while each provider handles its own secure login.",
-      stats: {
-        chronogolf: "Live tee times",
-        teetime: "Toronto live slots",
-        toronto: "City + GTA links",
-        connected: "Connected",
-        active: (count) => `${count} active`,
-      },
-      providerHosted: "Provider hosted",
-      connectedStatus: "Live · Connected",
-      yourClub: "Your club",
-      chooseClub: (count) => `Choose your club (${count})`,
-      signInClub: (clubName) => `Sign in · ${clubName}`,
-      connected: "Connected",
-      chooseClubToSignIn: "Choose a club to sign in",
-      loggedIn: "I'm logged in",
-      disconnect: "Disconnect on this device",
-      clubHelp: "Club not listed? Get help finding its login",
-      markedConnected: (providerName) => `${providerName} is marked connected on this device.`,
-      confirmSignedIn: (providerName) =>
-        `Confirm once you are signed in so Fairway can mark ${providerName} as connected here.`,
-      opensLogin: "Opens the provider's login form in a new tab.",
-      gggolfClubAccess: "GGGolf accounts are accessed through your club.",
-      note: "Fairway checks live Chronogolf and TeeTime tee sheets when they are available. Other provider cards are secure handoffs to the booking system golfers already use. In-app account linking and checkout are not available yet, so complete and confirm your reservation with the provider.",
-      provider: {
-        chronogolf: {
-          action: "Sign in on Chronogolf",
-          description:
-            "Live tee times come from Chronogolf when its course sheet is open. Sign in there before you finish booking.",
-        },
-        teetime: {
-          action: "Sign in on TeeTime",
-          description:
-            "Toronto live tee times can come from TeeTime clubs. Sign in there before you finish booking.",
-        },
-        golfthe6ix: {
-          action: "Open Golf the 6ix",
-          description: "City of Toronto courses use Golf the 6ix for provider-hosted booking.",
-        },
-        golfnow: {
-          action: "Sign in on GolfNow",
-          description:
-            "GolfNow is useful for Toronto-area provider handoffs where clubs use its booking network.",
-        },
-        minutegolf: {
-          action: "Sign in on MinuteGolf",
-          description: "Use MinuteGolf's own secure page. Your password stays with MinuteGolf.",
-        },
-        gggolf: {
-          action: "Sign in on GGGolf",
-          description: "Choose a verified local club portal. Your password stays with GGGolf.",
-        },
-      },
-    },
     search: {
-      loadingMap: "Loading map…",
-      eyebrow: (area) => `Search ${area}`,
-      title: "Your time. Your price.\nEvery fairway.",
-      body: "Compare every useful option first. Only provider-confirmed slots appear here, so prices and times come from live booking sheets.",
-      marketArea: { montreal: "Greater Montréal", toronto: "Toronto + GTA" },
-      availabilityTitle: "Availability quality",
-      liveOnlyBody:
-        "Only provider-confirmed slots are shown. If a provider has not opened its tee sheet or the slot disappeared, Fairway shows no card.",
-      liveOnly: "Live only",
+      label: "Search tee times",
+      markets: {
+        montreal: { label: "Montréal", short: "MTL" },
+        toronto: { label: "Toronto", short: "TOR" },
+      },
       date: "Date",
-      preferredTime: "I want to play around",
+      time: "Tee off around",
+      flex: "Flexible by",
       players: "Players",
-      flexibleBy: "Flexible by",
+      find: "Find tee times",
+      finding: "Searching…",
+      flexValue: (m) => (m === 0 ? "Exact time" : m < 60 ? `± ${m} min` : `± ${m / 60} hr`),
+      playersValue: (n) => plural(n, "player", "players"),
+      quickDates: { today: "Today", tomorrow: "Tomorrow", saturday: "Sat", sunday: "Sun" },
+      editSearch: "Edit search",
+      filters: "Filters",
+      morePlayers: "Add a player",
+      fewerPlayers: "Remove a player",
+    },
+    filters: {
+      title: "Refine your search",
+      yourRound: "Your round",
+      refine: "Filters",
       holes: "Holes",
       any: "Any",
-      holesValue: (holes) => `${holes} holes`,
-      targetBudget: "Target budget",
-      hardCeiling: "Hard ceiling",
+      holesValue: (h) => `${h} holes`,
+      maxPrice: "Max green fee",
+      targetBudget: "Budget sweet spot",
+      targetHint: "Sort by “Closest to my budget” to rank by this.",
       regions: "Regions",
-      publicOnly: "Public courses only",
       allRegions: "All regions",
-      loadingButton: "Searching the fairways…",
-      submit: "Find my tee times",
-      updating: "Updating tee times…",
-      resultHeading: (total, courses) =>
-        `${total} tee ${total === 1 ? "time" : "times"} · ${courses} ${courses === 1 ? "course" : "courses"}`,
-      rangeFrom: () => "From",
-      resultSummary: (liveRows) =>
-        `${liveRows} live provider ${liveRows === 1 ? "slot" : "slots"}`,
-      noResultsMeta: "No results match this search. Availability can change; check again or adjust your filters.",
-      locationUnavailable: "Location isn't available in this browser.",
-      locationError: "Couldn't get your location — allow it and try again.",
-      serviceError: "We couldn't reach the tee-time service. Please try again.",
-      genericError: "Something went wrong",
-      useLocationTitle: "Sort and measure by distance from where you are",
-      locating: "Locating…",
-      usingLocation: "Using your location",
-      useLocation: "Use my location",
-      list: "List",
-      map: "Map",
-      change: "change",
+      publicOnly: "Public courses only",
+      cartOnly: "Cart included",
+      reset: "Reset filters",
+      show: (n) => (n === 1 ? "Show 1 tee time" : `Show ${n} tee times`),
+      close: "Close filters",
+    },
+    results: {
+      eyebrow: "Live tee times",
+      checking: (n) => (n > 0 ? `Checking ${n} courses…` : "Checking live tee sheets…"),
+      checkingCourse: "Now checking",
+      foundSoFar: (n) => `${plural(n, "tee time", "tee times")} found so far`,
+      heading: (n) => (n === 1 ? "tee time" : "tee times"),
+      acrossCourses: (n) => `across ${plural(n, "course", "courses")}`,
+      windowSummary: (date, start, end) => `${date} · ${start} – ${end}`,
+      views: { course: "By course", time: "By time", map: "Map" },
+      viewsLabel: "Result view",
       sort: "Sort",
       sortLabels: {
-        "price-desc": "Price: high → low",
-        "price-asc": "Price: low → high",
-        "closest-price": "Closest to my budget",
         "closest-time": "Closest to my time",
-        distance: "Nearest to me",
+        "price-asc": "Price: low → high",
+        "price-desc": "Price: high → low",
+        "closest-price": "Closest to my budget",
+        distance: "Nearest",
       },
-      closest: "Closest to you",
-      liveNow: "live now",
-      sortNearest: "Sort by nearest →",
-      noMatches: () =>
-        "No provider-confirmed tee times match those filters. Try another time, region, or budget.",
-      courseFallbackHeading: (count) => `${count} supported ${count === 1 ? "course" : "courses"}`,
-      courseFallbackBody:
-        "Live tee times are not reachable from this host right now, so Fairway is showing course/provider handoffs without prices or tee times.",
-      courseFallbackCardNote: "No live tee time or price is shown until the provider confirms inventory.",
-      providerHandoffBadge: "Provider handoff",
-      openProvider: (provider) => `Open ${provider} ↗`,
-      mapCaption: (count, hasUser) =>
-        `${count} courses · ${hasUser ? "blue dot is you" : "tap “Use my location” to measure distance"}. Tap a dot for times & booking.`,
-      liveLegend: "● live",
-      showingTop: (_shown, total) => `Showing the top 60 of ${total}. Tighten your filters to narrow it down.`,
-      confirmedTitle: "Confirmed on the course's live tee sheet right now",
-      estimatedTitle: "Not provider-confirmed",
-      unavailableTitle: "Not provider-confirmed, so Fairway will not offer this as bookable",
-      liveBadge: "● Live",
-      estimateBadge: "Unavailable",
-      unavailableBadge: "Unavailable",
-      connectedBadge: "Connected",
-      distanceFromYou: (km, minutes) => `${km} km · ~${minutes} min`,
-      cart: "cart",
-      onBudget: "On budget",
+      nearMe: "Near me",
+      locating: "Locating…",
+      usingLocation: "Using your location",
+      locationError: "Couldn't get your location — allow it and try again.",
+      locationUnavailable: "Location isn't available in this browser.",
+      timelineLabel: "Open slots through your window",
+      timelineHint: "Tap a bar to focus on that quarter hour.",
+      allTimes: "All times",
+      bucketLabel: (n, time) => `${plural(n, "slot", "slots")} at ${time}`,
+      from: "from",
       perPlayer: "per player",
-      spotsOpen: (spots) => `${spots} ${spots === 1 ? "spot" : "spots"} open`,
-      estimatedPerPlayer: "not provider-confirmed",
-      unavailablePerPlayer: "not provider-confirmed",
-      unavailable: "Unavailable",
-      bookWithConnected: (course, provider) => `Review ${course} before continuing with connected ${provider}`,
-      openDetails: (course) => `Review details for ${course}`,
-      bookWith: (provider) => `Continue with ${provider} ↗`,
-      review: "Review details",
-      check: "Check",
+      spots: (n) => `${plural(n, "spot", "spots")} open`,
+      cart: "cart",
+      holes: (n) => `${n} holes`,
+      moreTimes: (n) => `+${n} more`,
+      fewerTimes: "Show fewer",
+      bestMatch: "Best match",
+      onBudget: "On budget",
+      distance: (km, min) => (min == null ? `${km} km` : `${km} km · ~${min} min`),
+      showMore: (n) => `Show ${n} more`,
+      emptyTitle: "Nothing open in that window",
+      emptyBody: "Tee sheets fill fast. Widen the window, try another day, or loosen a filter.",
+      tryWider: "Widen to ± 2 hr",
+      tryTomorrow: "Try the next day",
+      clearFilters: "Clear filters",
+      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime" },
+      providerBusy: (p, s) => `${p} asked us to slow down${s ? ` — try again in about ${s}s` : ""}. Showing everything we could check.`,
+      providerPartial: (p) => `Some ${p} courses didn't answer in time, so a few tee times may be missing.`,
+      providerDown: (p) => `${p} isn't answering right now.`,
+      retry: "Retry",
+      serviceError: "We couldn't reach the tee-time service. Check your connection and try again.",
+      busyError: "You're searching faster than the tee sheets can keep up. Give it a few seconds.",
+      handoffTitle: (n) => `${plural(n, "course", "courses")} you can book directly`,
+      handoffBody: "Live tee sheets are unreachable for these right now. Open the course's own booking page to see times.",
+      handoffBadge: "Book on site",
+      openProvider: (name) => `Open ${name}`,
+      mapCaption: (n, hasUser) =>
+        `${plural(n, "course", "courses")} · ${hasUser ? "the blue dot is you" : "tap “Near me” to measure distance"}`,
+      loadingMap: "Loading map…",
+      live: "Live",
+      openDetails: (course, time) => `Book ${course} at ${time}`,
+      announce: (n, c) => `${plural(n, "tee time", "tee times")} across ${plural(c, "course", "courses")}`,
     },
     booking: {
-      invalidEmail: "Please enter a valid email address",
-      emailFailed: "The email could not be delivered.",
-      emailTryAgain: "Couldn't send the details — try again.",
-      srDescription: "Review this tee time and continue to the provider to complete the reservation.",
-      close: "Close booking details",
-      available: "Available tee time",
-      estimated: "Unavailable tee time",
+      close: "Close",
+      srDescription: "Review this tee time, then continue to the provider to reserve and pay.",
       live: "Live",
-      est: "Est.",
       date: "Date",
-      teeTime: "Tee time",
       where: "Where",
       round: "Round",
       greenFee: "Green fee · per player",
-      unavailableFee: "Not confirmed",
-      players: (count) => `${count} ${count === 1 ? "player" : "players"}`,
-      holes: (count) => `${count} holes`,
-      liveIntro: "Fairway will re-check this exact tee time with the provider before opening checkout.",
-      estimateIntro:
-        "This tee time is not provider-confirmed, so Fairway will not prepare it for booking.",
-      connectedIntro: (provider) =>
-        `Your ${provider} account is marked connected on this device, so this opens the provider booking page in one click.`,
-      contextualIntro: "Your date and round length are included in the booking link.",
-      checkIntro: "Check the date, time, player count, and price on the next page.",
-      providerConfirms: "The provider still confirms the reservation and payment.",
-      verifyingProvider: "Verifying live availability…",
-      verificationFailed: "This slot changed on the provider site. Search again before booking.",
-      invalidLink: "This course does not have a valid booking link yet.",
-      bookWith: (provider) => `Verify and continue on ${provider}`,
-      continueOn: (provider) => `Verify and continue on ${provider}`,
-      opened: (provider) => `${provider} opened`,
-      checkStep: (date, time) => `Check ${date} at ${time}`,
-      connectedStep: "Your provider account is already marked connected here",
-      signInStep: "Sign in or create your provider account",
-      confirmStep: "Review the total and confirm on the provider page",
-      noReservation:
-        "No reservation has been made in Fairway. The provider's confirmation is your proof of booking.",
-      reopen: (provider) => `Reopen ${provider}`,
-      sent: (email) => `Sent to ${email} — check your inbox.`,
-      emailDetails: "Email me these details too",
+      players: (n) => plural(n, "player", "players"),
+      holes: (n) => `${n} holes`,
+      checking: (p) => `Re-checking this slot with ${p}…`,
+      verified: "Still open — verified just now",
+      verifiedNote: "Your date and round length are already in the link.",
+      changed: "That tee time was just taken or changed. Pick another one.",
+      unverifiable: "The provider is busy, so we couldn't re-check. Its booking page shows what's open.",
+      continueOn: (p) => `Continue on ${p}`,
+      openAnyway: (p) => `Open ${p} anyway`,
+      pickAnother: "Back to tee times",
+      signInFirst: (p) => `Have a ${p} account? Sign in first`,
+      steps: {
+        check: (date, time) => `Pick ${time} on ${date}`,
+        signIn: "Sign in or check out as a guest",
+        confirm: "Confirm and pay with the course",
+      },
+      noReservation: "Fairway doesn't hold or book the slot. The course's confirmation is your booking.",
+      emailDetails: "Email me these details",
       emailLabel: "Email address",
-      sending: "Sending…",
       send: "Send",
-    },
-    features: {
-      imageAlt: "Golf ball on a tee in warm evening light",
-      imageEyebrow: "Made for the spontaneous round",
-      imageTitle: "More time playing. Less time searching.",
-      eyebrow: "Why Fairway",
-      title: "One search.\nA clearer choice.",
-      items: [
-        {
-          title: "The market in one view",
-          body: "See available rounds from supported booking platforms without juggling tabs.",
-        },
-        {
-          title: "Compare the real price",
-          body: "Sort by green fee, budget fit, time, or distance before you commit.",
-        },
-        {
-          title: "Search on your schedule",
-          body: "Choose an exact time or widen the window when the round matters more than the hour.",
-        },
-      ],
+      sending: "Sending…",
+      sent: (email) => `Sent to ${email}.`,
+      invalidEmail: "Please enter a valid email address",
+      emailFailed: "The email could not be delivered.",
     },
     sections: {
-      howEyebrow: "The Fairway route",
+      howEyebrow: "How it works",
       howTitle: "From an open afternoon\nto a booked round.",
       steps: [
-        { n: "01", title: "Set the round", body: "Choose the day, party size, preferred time, and how far you are willing to travel." },
-        { n: "02", title: "Compare the field", body: "Scan live tee times across supported providers and sort the results by price, time, or distance." },
-        { n: "03", title: "Finish the booking", body: "Pick your tee time and continue with the provider account you already use to review and confirm." },
+        { n: "01", title: "Pick the hour", body: "Choose the day, when you'd like to tee off, how flexible you are and how many are playing." },
+        { n: "02", title: "See every open slot", body: "Fairway reads live tee sheets across Montréal and Toronto and lines them up by course, time, price or distance." },
+        { n: "03", title: "Book with the course", body: "We re-check your slot, then send you to the course's booking page with the date already filled in." },
       ],
-      ctaAlt: "A golf course winding through forest in morning light",
-      ctaEyebrow: "Your next round is out there",
-      ctaTitle: "See what's open.\nChoose your fairway.",
-      ctaButton: "Search tee times",
       faqEyebrow: "Before you tee off",
-      faqTitle: "A few good questions.",
-      faqIntro:
-        "The app keeps discovery, provider sign-in, and booking handoff together, while final confirmation stays on the provider page.",
+      faqTitle: "Good questions.",
+      faqIntro: "Fairway finds and compares tee times. The course or its booking provider takes the reservation and payment.",
       faqs: [
-        { q: "Are all results live?", a: "Yes. Fairway now shows only provider-confirmed tee times. If a provider sheet is closed, unavailable, or the slot disappears, that card is not shown." },
-        { q: "Where does availability come from?", a: "Chronogolf and TeeTime availability appears only when their live tee sheets are reachable. Other provider account cards remain secure sign-in handoffs, but they do not create tee-time cards." },
-        { q: "How does the time window work?", a: "Choose your ideal tee time and up to three hours of flexibility in either direction. Fairway returns matching slots and lets you sort the list your way." },
-        { q: "Does Fairway complete the payment?", a: "You review the final details, sign in on the provider page, and complete payment there. The provider sends the booking confirmation." },
+        { q: "Are these tee times real?", a: "Yes. Fairway only shows slots that a provider's live tee sheet lists right now, and re-checks your pick before sending you on. Nothing is estimated." },
+        { q: "Where does availability come from?", a: "Chronogolf for most Québec and Ontario courses, plus TeeTime clubs in the GTA. Courses that use other systems appear as direct links to their own booking page." },
+        { q: "Why is a course missing or a time gone?", a: "Most courses open their sheets a few days ahead, and popular times go fast. If a provider is busy, Fairway shows what it could check and tells you." },
+        { q: "Does Fairway take payment?", a: "No. You confirm and pay on the course's booking page, and the course sends your confirmation." },
       ],
-      footerBody: "One place to discover and compare golf around Montréal and Toronto.",
+      footerBody: "One search for tee times around Montréal and Toronto.",
       footerSearch: "Search",
-      footerAccounts: "Accounts",
+      footerHow: "How it works",
       footerFaq: "FAQ",
-      footerNote: "Confirm final details with the provider.",
+      footerNote: "Bookings are confirmed by each course.",
     },
   },
   fr: {
     langName: "Français",
     toggleLabel: "Langue",
-    nav: {
-      accounts: "Comptes",
-      teeTimes: "Départs",
-      how: "Fonctionnement",
-      faq: "FAQ",
-      search: "Chercher",
-    },
+    nav: { teeTimes: "Départs", how: "Fonctionnement", faq: "FAQ", find: "Trouver un départ", home: "Accueil Fairway" },
     hero: {
-      eyebrow: (marketCount, courseCount) =>
-        `Montréal + Toronto · ${marketCount} marchés · ${courseCount} parcours suivis`,
+      eyebrow: (count) => (count > 0 ? `Montréal + Toronto · ${count} parcours, une recherche` : "Montréal + Toronto · une recherche"),
       title1: "Trouvez votre ronde.",
-      title2: "On vous l’aligne.",
-      explore: "Voir les départs",
-      connect: "Connecter les comptes",
-      body: "Comparez les parcours près de vous et les droits de jeu. Trouvez l’heure qui vous convient.",
-      trustTitle: "Prêt avant de réserver",
-      marketStat: "Marchés",
-      marketValue: (count) => `${count} zones en direct`,
-      courseStat: "Parcours",
-      courseValue: (count) => `${count} suivis`,
-      verifiedStat: "Avant la redirection",
-      verifiedValue: "Revérification en direct",
-      trustBody: "Fairway ouvre d’abord la fiche de vérification, puis revérifie le fournisseur avant la redirection.",
+      title2: "On s’occupe du reste.",
+      body: "Choisissez le jour et l’heure de départ souhaitée. Fairway consulte les feuilles de départ en direct de la région et affiche chaque créneau libre autour.",
       playVideo: "Lire la vidéo d’arrière-plan",
-      pauseVideo: "Mettre la vidéo d’arrière-plan en pause",
+      pauseVideo: "Mettre la vidéo en pause",
       videoUnsupported: "Votre navigateur ne prend pas en charge la vidéo d’arrière-plan.",
     },
-    accounts: {
-      eyebrow: "Commencez ici",
-      title: "Connectez d’abord vos comptes de réservation.",
-      body: "Ouvrez Chronogolf, TeeTime, Golf the 6ix, MinuteGolf, GolfNow ou la page de connexion GGGolf de votre club avant de comparer les départs. Fairway garde la recherche au même endroit pendant que chaque fournisseur gère sa propre connexion sécurisée.",
-      stats: {
-        chronogolf: "Départs en direct",
-        teetime: "Départs Toronto en direct",
-        toronto: "Liens ville + RGT",
-        connected: "Connecté",
-        active: (count) => `${count} actif${count === 1 ? "" : "s"}`,
-      },
-      providerHosted: "Chez le fournisseur",
-      connectedStatus: "En direct · Connecté",
-      yourClub: "Votre club",
-      chooseClub: (count) => `Choisir votre club (${count})`,
-      signInClub: (clubName) => `Connexion · ${clubName}`,
-      connected: "Connecté",
-      chooseClubToSignIn: "Choisissez un club pour vous connecter",
-      loggedIn: "Je suis connecté",
-      disconnect: "Déconnecter sur cet appareil",
-      clubHelp: "Club absent? Aide pour trouver sa connexion",
-      markedConnected: (providerName) => `${providerName} est marqué connecté sur cet appareil.`,
-      confirmSignedIn: (providerName) =>
-        `Confirmez après vous être connecté pour que Fairway marque ${providerName} comme connecté ici.`,
-      opensLogin: "Ouvre le formulaire de connexion du fournisseur dans un nouvel onglet.",
-      gggolfClubAccess: "Les comptes GGGolf passent par votre club.",
-      note: "Fairway vérifie les feuilles de départ Chronogolf et TeeTime en direct quand elles sont accessibles. Les autres cartes de fournisseurs sont des redirections sécurisées vers les systèmes de réservation déjà utilisés par les golfeurs. La connexion de compte et le paiement intégrés ne sont pas encore disponibles; complétez et confirmez donc votre réservation chez le fournisseur.",
-      provider: {
-        chronogolf: {
-          action: "Connexion à Chronogolf",
-          description:
-            "Les départs en direct viennent de Chronogolf quand la feuille du parcours est ouverte. Connectez-vous là-bas avant de terminer la réservation.",
-        },
-        teetime: {
-          action: "Connexion à TeeTime",
-          description:
-            "Les départs en direct à Toronto peuvent venir des clubs TeeTime. Connectez-vous là-bas avant de terminer la réservation.",
-        },
-        golfthe6ix: {
-          action: "Ouvrir Golf the 6ix",
-          description: "Les parcours de la Ville de Toronto utilisent Golf the 6ix pour la réservation chez le fournisseur.",
-        },
-        golfnow: {
-          action: "Connexion à GolfNow",
-          description:
-            "GolfNow est utile pour les redirections de parcours de la région de Toronto qui utilisent son réseau de réservation.",
-        },
-        minutegolf: {
-          action: "Connexion à MinuteGolf",
-          description: "Utilisez la page sécurisée de MinuteGolf. Votre mot de passe reste avec MinuteGolf.",
-        },
-        gggolf: {
-          action: "Connexion à GGGolf",
-          description: "Choisissez un portail de club local vérifié. Votre mot de passe reste avec GGGolf.",
-        },
-      },
-    },
     search: {
-      loadingMap: "Chargement de la carte…",
-      eyebrow: (area) => `Recherche ${area}`,
-      title: "Votre heure. Votre prix.\nTous les fairways.",
-      body: "Comparez d’abord toutes les bonnes options. Seuls les départs confirmés par les fournisseurs apparaissent ici, avec des prix et heures tirés des feuilles de réservation en direct.",
-      marketArea: { montreal: "Grand Montréal", toronto: "Toronto + RGT" },
-      availabilityTitle: "Qualité de la disponibilité",
-      liveOnlyBody:
-        "Seuls les départs confirmés par les fournisseurs sont affichés. Si la feuille n’est pas ouverte ou si le départ a disparu, Fairway ne montre pas de carte.",
-      liveOnly: "Direct seulement",
+      label: "Rechercher des départs",
+      markets: {
+        montreal: { label: "Montréal", short: "MTL" },
+        toronto: { label: "Toronto", short: "TOR" },
+      },
       date: "Date",
-      preferredTime: "Je veux jouer vers",
+      time: "Départ vers",
+      flex: "Flexibilité",
       players: "Joueurs",
-      flexibleBy: "Flexible de",
+      find: "Trouver des départs",
+      finding: "Recherche…",
+      flexValue: (m) => (m === 0 ? "Heure exacte" : m < 60 ? `± ${m} min` : `± ${String(m / 60).replace(".", ",")} h`),
+      playersValue: (n) => plural(n, "joueur", "joueurs"),
+      quickDates: { today: "Aujourd’hui", tomorrow: "Demain", saturday: "Sam.", sunday: "Dim." },
+      editSearch: "Modifier",
+      filters: "Filtres",
+      morePlayers: "Ajouter un joueur",
+      fewerPlayers: "Retirer un joueur",
+    },
+    filters: {
+      title: "Affinez votre recherche",
+      yourRound: "Votre ronde",
+      refine: "Filtres",
       holes: "Trous",
       any: "Tous",
-      holesValue: (holes) => `${holes} trous`,
-      targetBudget: "Budget cible",
-      hardCeiling: "Prix maximum",
+      holesValue: (h) => `${h} trous`,
+      maxPrice: "Droit de jeu max.",
+      targetBudget: "Budget idéal",
+      targetHint: "Triez par « Plus près de mon budget » pour classer selon ce montant.",
       regions: "Régions",
-      publicOnly: "Parcours publics seulement",
       allRegions: "Toutes les régions",
-      loadingButton: "Recherche des départs…",
-      submit: "Trouver mes départs",
-      updating: "Mise à jour des départs…",
-      resultHeading: (total, courses) =>
-        `${total} départ${total === 1 ? "" : "s"} · ${courses} parcours`,
-      rangeFrom: () => "À partir de",
-      resultSummary: (liveRows) =>
-        `${liveRows} départ${liveRows === 1 ? "" : "s"} fournisseur en direct`,
-      noResultsMeta: "Aucun résultat ne correspond à cette recherche. La disponibilité peut changer; réessayez ou ajustez vos filtres.",
-      locationUnavailable: "La localisation n’est pas disponible dans ce navigateur.",
-      locationError: "Impossible d’obtenir votre position — autorisez-la et réessayez.",
-      serviceError: "Impossible de joindre le service de départs. Veuillez réessayer.",
-      genericError: "Une erreur est survenue",
-      useLocationTitle: "Trier et mesurer la distance depuis votre position",
-      locating: "Localisation…",
-      usingLocation: "Position utilisée",
-      useLocation: "Utiliser ma position",
-      list: "Liste",
-      map: "Carte",
-      change: "changer",
+      publicOnly: "Parcours publics seulement",
+      cartOnly: "Voiturette incluse",
+      reset: "Réinitialiser",
+      show: (n) => (n === 1 ? "Voir 1 départ" : `Voir ${n} départs`),
+      close: "Fermer les filtres",
+    },
+    results: {
+      eyebrow: "Départs en direct",
+      checking: (n) => (n > 0 ? `Vérification de ${n} parcours…` : "Vérification des feuilles de départ…"),
+      checkingCourse: "En cours",
+      foundSoFar: (n) => `${plural(n, "départ trouvé", "départs trouvés")} jusqu’ici`,
+      heading: (n) => (n === 1 ? "départ" : "départs"),
+      acrossCourses: (n) => `dans ${plural(n, "parcours", "parcours")}`,
+      windowSummary: (date, start, end) => `${date} · ${start} – ${end}`,
+      views: { course: "Par parcours", time: "Par heure", map: "Carte" },
+      viewsLabel: "Affichage des résultats",
       sort: "Trier",
       sortLabels: {
-        "price-desc": "Prix : élevé → bas",
-        "price-asc": "Prix : bas → élevé",
-        "closest-price": "Plus près de mon budget",
         "closest-time": "Plus près de mon heure",
-        distance: "Le plus proche",
+        "price-asc": "Prix : croissant",
+        "price-desc": "Prix : décroissant",
+        "closest-price": "Plus près de mon budget",
+        distance: "Les plus proches",
       },
-      closest: "Le plus proche de vous",
-      liveNow: "en direct",
-      sortNearest: "Trier par proximité →",
-      noMatches: () =>
-        "Aucun départ confirmé par un fournisseur ne correspond à ces filtres. Essayez une autre heure, région ou budget.",
-      courseFallbackHeading: (count) => `${count} parcours compatibles`,
-      courseFallbackBody:
-        "Les départs en direct ne sont pas accessibles depuis cet hébergeur pour le moment; Fairway affiche donc les liens officiels des parcours sans prix ni heure de départ.",
-      courseFallbackCardNote: "Aucun prix ni départ n’est affiché tant que le fournisseur ne confirme pas l’inventaire.",
-      providerHandoffBadge: "Lien fournisseur",
-      openProvider: (provider) => `Ouvrir ${provider} ↗`,
-      mapCaption: (count, hasUser) =>
-        `${count} parcours · ${hasUser ? "le point bleu, c’est vous" : "touchez « Utiliser ma position » pour mesurer la distance"}. Touchez un point pour voir les heures et réserver.`,
-      liveLegend: "● direct",
-      showingTop: (_shown, total) => `Affichage des 60 meilleurs sur ${total}. Resserrez les filtres pour réduire la liste.`,
-      confirmedTitle: "Confirmé sur la feuille de départ en direct du parcours",
-      estimatedTitle: "Non confirmé par le fournisseur",
-      unavailableTitle: "Non confirmé par le fournisseur, donc Fairway ne l’offre pas comme réservable",
-      liveBadge: "● Direct",
-      estimateBadge: "Indisponible",
-      unavailableBadge: "Indisponible",
-      connectedBadge: "Connecté",
-      distanceFromYou: (km, minutes) => `${km} km · ~${minutes} min`,
-      cart: "voiturette",
-      onBudget: "Dans le budget",
+      nearMe: "Près de moi",
+      locating: "Localisation…",
+      usingLocation: "Votre position",
+      locationError: "Impossible d’obtenir votre position — autorisez-la et réessayez.",
+      locationUnavailable: "La localisation n’est pas offerte dans ce navigateur.",
+      timelineLabel: "Créneaux libres dans votre plage",
+      timelineHint: "Touchez une barre pour voir ce quart d’heure.",
+      allTimes: "Toutes les heures",
+      bucketLabel: (n, time) => `${plural(n, "créneau", "créneaux")} à ${time}`,
+      from: "dès",
       perPlayer: "par joueur",
-      spotsOpen: (spots) => `${spots} place${spots === 1 ? "" : "s"} libre${spots === 1 ? "" : "s"}`,
-      estimatedPerPlayer: "non confirmé par le fournisseur",
-      unavailablePerPlayer: "non confirmé par le fournisseur",
-      unavailable: "Indisponible",
-      bookWithConnected: (course, provider) => `Voir ${course} avant de continuer avec le compte ${provider} connecté`,
-      openDetails: (course) => `Voir les détails pour ${course}`,
-      bookWith: (provider) => `Continuer avec ${provider} ↗`,
-      review: "Voir les détails",
-      check: "Vérifier",
+      spots: (n) => `${plural(n, "place libre", "places libres")}`,
+      cart: "voiturette",
+      holes: (n) => `${n} trous`,
+      moreTimes: (n) => `+${n} autres`,
+      fewerTimes: "Voir moins",
+      bestMatch: "Meilleur choix",
+      onBudget: "Dans le budget",
+      distance: (km, min) => (min == null ? `${km} km` : `${km} km · ~${min} min`),
+      showMore: (n) => `Voir ${n} de plus`,
+      emptyTitle: "Rien de libre dans cette plage",
+      emptyBody: "Les feuilles de départ se remplissent vite. Élargissez la plage, essayez un autre jour ou retirez un filtre.",
+      tryWider: "Élargir à ± 2 h",
+      tryTomorrow: "Essayer le lendemain",
+      clearFilters: "Effacer les filtres",
+      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime" },
+      providerBusy: (p, s) => `${p} nous demande de ralentir${s ? ` — réessayez dans environ ${s} s` : ""}. Voici tout ce qu’on a pu vérifier.`,
+      providerPartial: (p) => `Certains parcours ${p} n’ont pas répondu à temps; quelques départs peuvent manquer.`,
+      providerDown: (p) => `${p} ne répond pas pour le moment.`,
+      retry: "Réessayer",
+      serviceError: "Impossible de joindre le service de départs. Vérifiez votre connexion et réessayez.",
+      busyError: "Vous cherchez plus vite que les feuilles de départ peuvent suivre. Patientez quelques secondes.",
+      handoffTitle: (n) => `${plural(n, "parcours", "parcours")} à réserver directement`,
+      handoffBody: "Leurs feuilles en direct sont inaccessibles pour l’instant. Ouvrez la page de réservation du parcours pour voir les heures.",
+      handoffBadge: "Réserver sur le site",
+      openProvider: (name) => `Ouvrir ${name}`,
+      mapCaption: (n, hasUser) =>
+        `${plural(n, "parcours", "parcours")} · ${hasUser ? "le point bleu, c’est vous" : "touchez « Près de moi » pour mesurer la distance"}`,
+      loadingMap: "Chargement de la carte…",
+      live: "Direct",
+      openDetails: (course, time) => `Réserver ${course} à ${time}`,
+      announce: (n, c) => `${plural(n, "départ", "départs")} dans ${plural(c, "parcours", "parcours")}`,
     },
     booking: {
-      invalidEmail: "Veuillez entrer une adresse courriel valide",
-      emailFailed: "Le courriel n’a pas pu être envoyé.",
-      emailTryAgain: "Impossible d’envoyer les détails — réessayez.",
-      srDescription: "Vérifiez ce départ et continuez chez le fournisseur pour compléter la réservation.",
-      close: "Fermer les détails de réservation",
-      available: "Départ disponible",
-      estimated: "Départ indisponible",
+      close: "Fermer",
+      srDescription: "Vérifiez ce départ, puis continuez chez le fournisseur pour réserver et payer.",
       live: "Direct",
-      est: "Est.",
       date: "Date",
-      teeTime: "Heure de départ",
       where: "Lieu",
       round: "Ronde",
       greenFee: "Droit de jeu · par joueur",
-      unavailableFee: "Non confirmé",
-      players: (count) => `${count} joueur${count === 1 ? "" : "s"}`,
-      holes: (count) => `${count} trous`,
-      liveIntro: "Fairway revérifie ce départ exact chez le fournisseur avant d’ouvrir la réservation.",
-      estimateIntro:
-        "Ce départ n’est pas confirmé par le fournisseur, donc Fairway ne le prépare pas pour la réservation.",
-      connectedIntro: (provider) =>
-        `Votre compte ${provider} est marqué connecté sur cet appareil; la page de réservation du fournisseur s’ouvre donc en un clic.`,
-      contextualIntro: "La date et la durée de la ronde sont incluses dans le lien de réservation.",
-      checkIntro: "Vérifiez la date, l’heure, le nombre de joueurs et le prix sur la page suivante.",
-      providerConfirms: "Le fournisseur confirme quand même la réservation et le paiement.",
-      verifyingProvider: "Vérification de la disponibilité en direct…",
-      verificationFailed: "Ce départ a changé sur le site du fournisseur. Relancez la recherche avant de réserver.",
-      invalidLink: "Ce parcours n’a pas encore de lien de réservation valide.",
-      bookWith: (provider) => `Vérifier et continuer sur ${provider}`,
-      continueOn: (provider) => `Vérifier et continuer sur ${provider}`,
-      opened: (provider) => `${provider} ouvert`,
-      checkStep: (date, time) => `Vérifiez ${date} à ${time}`,
-      connectedStep: "Votre compte fournisseur est déjà marqué connecté ici",
-      signInStep: "Connectez-vous ou créez votre compte fournisseur",
-      confirmStep: "Vérifiez le total et confirmez sur la page du fournisseur",
-      noReservation:
-        "Aucune réservation n’a été faite dans Fairway. La confirmation du fournisseur est votre preuve de réservation.",
-      reopen: (provider) => `Rouvrir ${provider}`,
-      sent: (email) => `Envoyé à ${email} — vérifiez votre boîte de réception.`,
-      emailDetails: "M’envoyer aussi ces détails par courriel",
+      players: (n) => plural(n, "joueur", "joueurs"),
+      holes: (n) => `${n} trous`,
+      checking: (p) => `Nouvelle vérification auprès de ${p}…`,
+      verified: "Toujours libre — vérifié à l’instant",
+      verifiedNote: "La date et le nombre de trous sont déjà dans le lien.",
+      changed: "Ce départ vient d’être pris ou a changé. Choisissez-en un autre.",
+      unverifiable: "Le fournisseur est occupé; on n’a pas pu revérifier. Sa page de réservation montre ce qui est libre.",
+      continueOn: (p) => `Continuer sur ${p}`,
+      openAnyway: (p) => `Ouvrir ${p} quand même`,
+      pickAnother: "Retour aux départs",
+      signInFirst: (p) => `Vous avez un compte ${p}? Connectez-vous d’abord`,
+      steps: {
+        check: (date, time) => `Choisissez ${time} le ${date}`,
+        signIn: "Connectez-vous ou payez comme invité",
+        confirm: "Confirmez et payez auprès du parcours",
+      },
+      noReservation: "Fairway ne retient ni ne réserve le départ. La confirmation du parcours fait foi.",
+      emailDetails: "M’envoyer ces détails par courriel",
       emailLabel: "Adresse courriel",
-      sending: "Envoi…",
       send: "Envoyer",
-    },
-    features: {
-      imageAlt: "Balle de golf sur un tee dans une lumière chaude de fin de journée",
-      imageEyebrow: "Pensé pour la ronde spontanée",
-      imageTitle: "Plus de temps à jouer. Moins de temps à chercher.",
-      eyebrow: "Pourquoi Fairway",
-      title: "Une recherche.\nUn choix plus clair.",
-      items: [
-        {
-          title: "Le marché en une seule vue",
-          body: "Voyez les rondes disponibles sur les plateformes compatibles sans jongler avec les onglets.",
-        },
-        {
-          title: "Comparez le vrai prix",
-          body: "Triez par droit de jeu, respect du budget, heure ou distance avant de réserver.",
-        },
-        {
-          title: "Cherchez selon votre horaire",
-          body: "Choisissez une heure exacte ou élargissez la fenêtre quand la ronde compte plus que l’heure précise.",
-        },
-      ],
+      sending: "Envoi…",
+      sent: (email) => `Envoyé à ${email}.`,
+      invalidEmail: "Entrez une adresse courriel valide",
+      emailFailed: "Le courriel n’a pas pu être envoyé.",
     },
     sections: {
-      howEyebrow: "Le parcours Fairway",
+      howEyebrow: "Fonctionnement",
       howTitle: "D’un après-midi libre\nà une ronde réservée.",
       steps: [
-        { n: "01", title: "Réglez la ronde", body: "Choisissez la journée, la taille du groupe, l’heure préférée et la distance que vous êtes prêt à parcourir." },
-        { n: "02", title: "Comparez le terrain", body: "Parcourez les départs en direct chez les fournisseurs compatibles et triez les résultats par prix, heure ou distance." },
-        { n: "03", title: "Terminez la réservation", body: "Choisissez votre départ et continuez avec le compte fournisseur que vous utilisez déjà pour vérifier et confirmer." },
+        { n: "01", title: "Choisissez l’heure", body: "Le jour, l’heure de départ souhaitée, votre flexibilité et le nombre de joueurs." },
+        { n: "02", title: "Voyez chaque créneau", body: "Fairway lit les feuilles de départ en direct à Montréal et Toronto et les classe par parcours, heure, prix ou distance." },
+        { n: "03", title: "Réservez avec le parcours", body: "On revérifie votre créneau, puis on vous envoie à la page de réservation avec la date déjà remplie." },
       ],
-      ctaAlt: "Un parcours de golf qui serpente dans la forêt au matin",
-      ctaEyebrow: "Votre prochaine ronde vous attend",
-      ctaTitle: "Voyez ce qui est libre.\nChoisissez votre fairway.",
-      ctaButton: "Chercher des départs",
-      faqEyebrow: "Avant de prendre le départ",
-      faqTitle: "Quelques bonnes questions.",
-      faqIntro:
-        "L’app garde la découverte, la connexion aux fournisseurs et la redirection de réservation ensemble, pendant que la confirmation finale reste sur la page du fournisseur.",
+      faqEyebrow: "Avant le départ",
+      faqTitle: "Bonnes questions.",
+      faqIntro: "Fairway trouve et compare les départs. Le parcours ou son fournisseur prend la réservation et le paiement.",
       faqs: [
-        { q: "Tous les résultats sont-ils en direct?", a: "Oui. Fairway affiche seulement les départs confirmés par les fournisseurs. Si une feuille est fermée, inaccessible ou si le départ disparaît, la carte n’est pas affichée." },
-        { q: "D’où vient la disponibilité?", a: "Les disponibilités Chronogolf et TeeTime apparaissent seulement quand leurs feuilles en direct sont accessibles. Les autres cartes de fournisseurs restent des liens de connexion sécurisés, sans créer de cartes de départ." },
-        { q: "Comment fonctionne la fenêtre horaire?", a: "Choisissez votre heure idéale et jusqu’à trois heures de flexibilité de chaque côté. Fairway retourne les départs correspondants et vous laisse trier la liste à votre façon." },
-        { q: "Fairway complète-t-il le paiement?", a: "Vous vérifiez les derniers détails, vous vous connectez sur la page du fournisseur et vous payez là-bas. Le fournisseur envoie la confirmation de réservation." },
+        { q: "Ces départs sont-ils réels?", a: "Oui. Fairway affiche seulement les créneaux qu’une feuille de départ en direct liste en ce moment, et revérifie votre choix avant de vous rediriger. Rien n’est estimé." },
+        { q: "D’où vient la disponibilité?", a: "De Chronogolf pour la plupart des parcours du Québec et de l’Ontario, et des clubs TeeTime dans la RGT. Les parcours sur d’autres systèmes apparaissent comme liens directs vers leur page de réservation." },
+        { q: "Pourquoi un parcours ou une heure manque-t-il?", a: "La plupart des parcours ouvrent leurs feuilles quelques jours d’avance et les bonnes heures partent vite. Si un fournisseur est occupé, Fairway affiche ce qu’il a pu vérifier et vous le dit." },
+        { q: "Fairway prend-il le paiement?", a: "Non. Vous confirmez et payez sur la page de réservation du parcours, qui vous envoie la confirmation." },
       ],
-      footerBody: "Un seul endroit pour découvrir et comparer le golf autour de Montréal et Toronto.",
+      footerBody: "Une seule recherche pour les départs autour de Montréal et Toronto.",
       footerSearch: "Chercher",
-      footerAccounts: "Comptes",
+      footerHow: "Fonctionnement",
       footerFaq: "FAQ",
-      footerNote: "Confirmez les derniers détails avec le fournisseur.",
+      footerNote: "Chaque parcours confirme sa réservation.",
     },
   },
 };
@@ -768,7 +518,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Language>("en");
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("fairway-language");
+    let saved: string | null = null;
+    try {
+      saved = window.localStorage.getItem("fairway-language");
+    } catch {
+      // Private browsing can block storage; English stays the default.
+    }
     if (saved !== "fr" && saved !== "en") return;
     const frame = window.requestAnimationFrame(() => setLangState(saved));
     return () => window.cancelAnimationFrame(frame);
@@ -780,7 +535,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLang = (next: Language) => {
     setLangState(next);
-    window.localStorage.setItem("fairway-language", next);
+    try {
+      window.localStorage.setItem("fairway-language", next);
+    } catch {
+      // Storage is optional.
+    }
   };
 
   const value = useMemo(() => ({ lang, setLang, t: copy[lang] }), [lang]);
@@ -801,10 +560,21 @@ export function formatLongDateForLanguage(date: string, lang: Language) {
   );
 }
 
-export function windowLabel(minutes: number, lang: Language) {
-  if (minutes === 0) return lang === "fr" ? "0 min" : "0 min";
-  if (minutes < 60) return `${minutes} min`;
-  const hours = minutes / 60;
-  if (Number.isInteger(hours)) return lang === "fr" ? `${hours} h` : `${hours} hr`;
-  return lang === "fr" ? `${hours.toFixed(1)} h` : `${hours.toFixed(1)} hr`;
+export function formatShortDateForLanguage(date: string, lang: Language) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString(
+    lang === "fr" ? "fr-CA" : "en-CA",
+    { weekday: "short", month: "short", day: "numeric" },
+  );
+}
+
+/** Clock time split for display: "1:05" + "PM" in English, "13 h 05" in French. */
+export function timeParts(time: string, lang: Language): { main: string; suffix: string } {
+  const [h, m] = time.split(":").map(Number);
+  if (lang === "fr") return { main: `${h} h ${String(m).padStart(2, "0")}`, suffix: "" };
+  return { main: `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")}`, suffix: h >= 12 ? "PM" : "AM" };
+}
+
+export function formatTimeForLanguage(time: string, lang: Language) {
+  const { main, suffix } = timeParts(time, lang);
+  return suffix ? `${main} ${suffix}` : main;
 }

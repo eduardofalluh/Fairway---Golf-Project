@@ -1,4 +1,4 @@
-import type { GolfCourse, TeeTime } from "../types";
+import type { GolfCourse, ProviderState, TeeTime } from "../types";
 
 const BASE = "https://tee-time.com";
 const UA =
@@ -72,36 +72,49 @@ function asPositiveNumber(value: number | string | null | undefined) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-async function fetchPage(slug: string, date: string): Promise<TeeTimePage | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
+const SHEET_TTL_S = 90;
+
+type PageResult = { page: TeeTimePage | null; throttled: boolean };
+
+async function fetchPage(slug: string, date: string, fresh: boolean): Promise<PageResult> {
   try {
-    const res = await fetch(`${BASE}/clubs/${slug}?date=${date}`, {
+    const res = await fetch(`${BASE}/clubs/${encodeURIComponent(slug)}?date=${date}`, {
       headers: HEADERS,
-      signal: controller.signal,
-      cache: "no-store",
+      signal: AbortSignal.timeout(7000),
+      // Only HTTP 200 pages enter Next's shared data cache.
+      ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: SHEET_TTL_S } }),
     });
-    if (!res.ok) return null;
+    if (res.status === 429) return { page: null, throttled: true };
+    if (!res.ok) return { page: null, throttled: false };
     const html = await res.text();
     const raw = html.match(/data-page="([\s\S]*?)"/)?.[1];
-    if (!raw) return null;
-    return JSON.parse(decodeHtmlAttribute(raw)) as TeeTimePage;
+    if (!raw) return { page: null, throttled: false };
+    return { page: JSON.parse(decodeHtmlAttribute(raw)) as TeeTimePage, throttled: false };
   } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
+    return { page: null, throttled: false };
   }
 }
 
+/** null = unavailable feed; [] = provider confirmed no bookable rows. */
 export async function fetchTeeTimeCourseTeeTimes(
   course: GolfCourse,
   date: string,
+  options: { fresh?: boolean } = {},
 ): Promise<TeeTime[] | null> {
-  if (DISABLED || !course.teeTimeSlug || !course.online) return null;
+  return (await fetchCourseSheet(course, date, Boolean(options.fresh))).rows;
+}
 
-  const page = await fetchPage(course.teeTimeSlug, date);
+async function fetchCourseSheet(
+  course: GolfCourse,
+  date: string,
+  fresh: boolean,
+): Promise<{ rows: TeeTime[] | null; throttled: boolean }> {
+  if (DISABLED || !course.teeTimeSlug || !course.online) return { rows: null, throttled: false };
+
+  const { page, throttled } = await fetchPage(course.teeTimeSlug, date, fresh);
+  if (throttled) return { rows: null, throttled };
   const availabilities = page?.props?.organization?.availabilities;
-  if (!availabilities) return null;
+  if (!availabilities) return { rows: null, throttled: false };
 
   const rows: TeeTime[] = [];
   for (const [bucketKey, bucket] of Object.entries(availabilities)) {
@@ -132,7 +145,25 @@ export async function fetchTeeTimeCourseTeeTimes(
     }
   }
 
-  return rows;
+  return { rows, throttled: false };
 }
 
-export const teeTimeStatus = { disabled: DISABLED, base: BASE };
+/** Live TeeTime rows inside [startMin, endMin] for several clubs. */
+export async function fetchTeeTimeWindow(
+  courses: GolfCourse[],
+  date: string,
+  startMin: number,
+  endMin: number,
+): Promise<{ rows: TeeTime[]; state: ProviderState }> {
+  const clubs = courses.filter((c) => c.online && c.teeTimeSlug);
+  if (clubs.length === 0) return { rows: [], state: { status: "ok" } };
+  const sheets = await Promise.all(clubs.map((course) => fetchCourseSheet(course, date, false)));
+  const rows = sheets
+    .flatMap((sheet) => sheet.rows ?? [])
+    .filter((row) => row.minutes >= startMin && row.minutes <= endMin);
+  const answered = sheets.filter((sheet) => sheet.rows).length;
+  const throttled = sheets.some((sheet) => sheet.throttled);
+  const status: ProviderState["status"] =
+    answered === clubs.length ? "ok" : answered > 0 ? "partial" : throttled ? "throttled" : "unavailable";
+  return { rows, state: throttled ? { status, retryAfterSec: 30 } : { status } };
+}

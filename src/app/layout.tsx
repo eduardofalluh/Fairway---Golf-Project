@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
 import { SmoothScroll } from "@/components/SmoothScroll";
@@ -18,7 +18,11 @@ const body = Inter({
 export const metadata: Metadata = {
   title: "Fairway — Montréal and Toronto tee times",
   description:
-    "Compare provider-confirmed tee times across Montréal and Toronto golf courses, then continue to the booking provider.",
+    "Pick a day and a time. Fairway checks live tee sheets across Montréal and Toronto golf courses and shows every open slot around it.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b2d20",
 };
 
 export default function RootLayout({

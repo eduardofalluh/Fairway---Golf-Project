@@ -107,3 +107,8 @@ export function classifyRegion(
   // ambiguous middle band — split by longitude
   return lng < -73.6 ? "North Shore" : "South Shore";
 }
+
+/** Rough driving time from straight-line distance (metro road factor). */
+export function driveMinutes(km: number): number {
+  return Math.max(1, Math.round(km * 1.2));
+}

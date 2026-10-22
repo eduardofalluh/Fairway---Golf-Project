@@ -1,7 +1,8 @@
-import type { GolfCourse, TeeTime } from "../types";
+import type { GolfCourse, ProviderState, TeeTime } from "../types";
 import { classifyRegion, distanceFromMarket } from "../geo";
 import { getMarket } from "../markets";
 import type { MarketId } from "../types";
+import { minutesToHHMM } from "../format";
 import { CHRONOGOLF_COURSE_UUIDS } from "./chronogolf-course-uuids";
 
 /**
@@ -19,14 +20,17 @@ import { CHRONOGOLF_COURSE_UUIDS } from "./chronogolf-course-uuids";
  *        online_booking_enabled }
  *
  *   2. Tee times  GET /marketplace/v2/teetimes?start_date=YYYY-MM-DD
- *                     &course_ids=<uuid>&holes=<n>&start_time=HH:MM&page=N
+ *                     &course_ids=<uuid,uuid,…>&holes=9,18
+ *                     &start_time=HH:MM&end_time=HH:MM&page=N
  *      → { status: "open"|"closed", teetimes: [{ start_time, date,
  *          has_cart, max_player_size, course{holes,name,uuid},
- *          default_price{green_fee, subtotal} }] }
+ *          default_price{green_fee, subtotal, bookable_holes} }] }
+ *      Rows come back sorted by start_time across every requested course,
+ *      24 per page, and `end_time` is inclusive.
  *
- * This is unofficial: endpoints can change, are best-effort, and a course's
- * tee sheet is only "open" inside its booking window (otherwise empty). All
- * failures fail soft — the aggregator shows no availability for that course.
+ * Chronogolf rate-limits bursts with HTTP 429, so a search asks only for the
+ * golfer's time window, batches many courses per request, shares cached pages
+ * for 90 seconds, and stops calling for a while once it is told to slow down.
  */
 
 const BASE = "https://www.chronogolf.com/marketplace/v2";
@@ -36,6 +40,14 @@ const HEADERS = { Accept: "application/json", "User-Agent": UA };
 
 /** Disable all live Chronogolf calls (e.g. offline dev) with CHRONOGOLF_OFF=1. */
 const DISABLED = process.env.CHRONOGOLF_OFF === "1";
+
+const DIRECTORY_TTL_S = 6 * 60 * 60;
+const SHEET_TTL_S = 90;
+// One request covers a whole search part, so a range costs ~one call per page of rows.
+const BATCH_SIZE = 40;
+const BATCH_CONCURRENCY = 2;
+const MAX_PAGES = 16;
+const DEFAULT_BLOCK_S = 20;
 
 interface SearchCourse {
   uuid: string;
@@ -77,31 +89,78 @@ interface Teetime {
   };
 }
 
+interface TeetimesResponse {
+  status?: string;
+  teetimes?: Teetime[];
+}
+
 interface ClubDetail {
   courses?: Array<{ uuid?: string; id?: number; holes?: number }>;
 }
 
-async function getJson<T>(url: string, revalidate: number): Promise<T | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-  try {
-    const res = await fetch(url, {
-      headers: HEADERS,
-      signal: controller.signal,
-      // Chronogolf tee sheets change minute-by-minute. On Netlify, Next's
-      // provider-level data cache can hold an empty sheet from a prior request,
-      // so keep these upstream reads outside that cache and rely on our small
-      // in-process directory/course caches instead.
-      cache: "no-store",
-    });
-    void revalidate;
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
+type Fetched<T> =
+  | { ok: true; data: T }
+  | { ok: false; throttled: boolean; retryAfterSec?: number };
+
+/** While Chronogolf has asked us to back off, no request leaves this process. */
+let blockedUntil = 0;
+
+export function resetChronogolfStateForTests() {
+  blockedUntil = 0;
+  directoryCache.clear();
+  courseUuidCache.clear();
+}
+
+function retryAfterSeconds(header: string | null): number | null {
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? null : Math.max(0, Math.ceil((at - Date.now()) / 1000));
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * One upstream read. `ttl` opts into Next's shared data cache (only HTTP 200
+ * responses are stored, so throttled answers are never cached); `fresh` skips
+ * every cache for pre-handoff verification.
+ */
+async function request<T>(url: string, cache: { ttl: number } | "fresh"): Promise<Fetched<T>> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const waitMs = blockedUntil - Date.now();
+    if (waitMs > 0) {
+      return { ok: false, throttled: true, retryAfterSec: Math.ceil(waitMs / 1000) };
+    }
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: HEADERS,
+        signal: AbortSignal.timeout(10000),
+        ...(cache === "fresh"
+          ? { cache: "no-store" as const }
+          : { next: { revalidate: cache.ttl } }),
+      });
+    } catch {
+      return { ok: false, throttled: false };
+    }
+    if (res.status === 429) {
+      const after = retryAfterSeconds(res.headers.get("retry-after")) ?? DEFAULT_BLOCK_S;
+      if (attempt === 0 && after <= 3) {
+        await sleep(after * 1000 + 250 + Math.random() * 500);
+        continue;
+      }
+      blockedUntil = Date.now() + after * 1000;
+      return { ok: false, throttled: true, retryAfterSec: after };
+    }
+    if (!res.ok) return { ok: false, throttled: false };
+    try {
+      return { ok: true, data: (await res.json()) as T };
+    } catch {
+      return { ok: false, throttled: false };
+    }
   }
+  return { ok: false, throttled: true, retryAfterSec: DEFAULT_BLOCK_S };
 }
 
 function bookingUrl(slug: string) {
@@ -148,18 +207,16 @@ function toCourse(market: MarketId, c: SearchCourse): GolfCourse | null {
 }
 
 const directoryCache = new Map<MarketId, { at: number; courses: GolfCourse[] }>();
-const DIRECTORY_TTL_MS = 6 * 60 * 60 * 1000;
 
 /**
- * Pull the live Chronogolf course directory around Montréal. Cached in-process
- * for 6h (and at the fetch layer). Returns [] if Chronogolf is unreachable.
+ * Pull the live Chronogolf course directory around a market. Cached in-process
+ * and in Next's data cache for 6h. Returns [] if Chronogolf is unreachable.
  */
 export async function getChronogolfCourses(market: MarketId = "montreal"): Promise<GolfCourse[]> {
   if (DISABLED) return [];
-  // We can't call Date.now()-free here in app runtime; this is fine in Next.
   const now = Date.now();
   const cached = directoryCache.get(market);
-  if (cached && now - cached.at < DIRECTORY_TTL_MS) {
+  if (cached && now - cached.at < DIRECTORY_TTL_S * 1000) {
     return cached.courses;
   }
 
@@ -171,13 +228,13 @@ export async function getChronogolfCourses(market: MarketId = "montreal"): Promi
       `${BASE}/search?location[lat]=${marketConfig.center.lat}` +
       `&location[lon]=${marketConfig.center.lng}&location[distance]=${radiusKm}` +
       `&published=true&page=${page}`;
-    const batch = await getJson<SearchCourse[]>(url, 21600);
-    if (!batch || batch.length === 0) break;
-    for (const c of batch) {
+    const batch = await request<SearchCourse[]>(url, { ttl: DIRECTORY_TTL_S });
+    if (!batch.ok || !Array.isArray(batch.data) || batch.data.length === 0) break;
+    for (const c of batch.data) {
       const mapped = toCourse(market, c);
       if (mapped) courses.push(mapped);
     }
-    if (batch.length < 25) break;
+    if (batch.data.length < 25) break;
   }
 
   if (courses.length === 0) {
@@ -211,15 +268,14 @@ function pad(t: string): { time: string; minutes: number } | null {
  *
  * CRITICAL: the `/teetimes` endpoint keys off the *course* uuid, not the *club*
  * uuid returned by `/search`. Passing the club uuid returns status:"closed"
- * for everything — which is why the app used to show only estimates. The club
- * detail endpoint lists the real course uuids. Cached in-process for 6h.
+ * for everything. The club detail endpoint lists the real course uuids.
  */
 const courseUuidCache = new Map<string, { at: number; uuids: string[] }>();
 
 async function getCourseUuids(slug: string): Promise<string[]> {
   const now = Date.now();
   const cached = courseUuidCache.get(slug);
-  if (cached && now - cached.at < DIRECTORY_TTL_MS) return cached.uuids;
+  if (cached && now - cached.at < DIRECTORY_TTL_S * 1000) return cached.uuids;
 
   // Some serverless hosts can read Chronogolf's public search and tee-time
   // endpoints but receive an empty/blocked response from `/clubs/:slug`. Keep a
@@ -230,55 +286,12 @@ async function getCourseUuids(slug: string): Promise<string[]> {
     return fallback;
   }
 
-  const detail = await getJson<ClubDetail>(`${BASE}/clubs/${slug}`, 21600);
-  const uuids = (detail?.courses ?? [])
+  const detail = await request<ClubDetail>(`${BASE}/clubs/${encodeURIComponent(slug)}`, { ttl: DIRECTORY_TTL_S });
+  const uuids = (detail.ok ? detail.data?.courses ?? [] : [])
     .map((c) => c.uuid)
     .filter((u): u is string => typeof u === "string" && u.length > 0);
   if (uuids.length) courseUuidCache.set(slug, { at: now, uuids });
   return uuids;
-}
-
-/** null = unavailable feed; [] = provider confirmed no bookable rows. */
-export async function fetchCourseTeeTimes(
-  course: GolfCourse,
-  date: string,
-): Promise<TeeTime[] | null> {
-  if (DISABLED || !course.chronogolfSlug || !course.online) return null;
-
-  const courseUuids = await getCourseUuids(course.chronogolfSlug);
-  if (!courseUuids.length) return null;
-
-  // Ask for both round lengths the club offers, in one query per page.
-  const holes =
-    [...new Set(course.holes.map((h) => (h >= 18 ? 18 : 9)))].join(",") || "9,18";
-  const ids = courseUuids.join(",");
-
-  const out: TeeTime[] = [];
-  const seen = new Set<string>();
-  let receivedSheet = false;
-  for (let page = 1; page <= 4; page++) {
-    const data = await getJson<TeetimesResponse>(
-      `${BASE}/teetimes?start_date=${date}&course_ids=${ids}` +
-        `&holes=${holes}&start_time=00:00&page=${page}`,
-      120,
-    );
-    if (data?.status === "closed" || (data?.status === "open" && Array.isArray(data.teetimes))) receivedSheet = true;
-    const rows = parseTeetimesResponse(course, date, data, new Set(courseUuids));
-    for (const row of rows) {
-      const key = `${row.time}-${row.holes}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(row);
-    }
-    // Stop once a page comes back short (last page) or empty.
-    if (!data?.teetimes || data.teetimes.length < 20) break;
-  }
-  return receivedSheet ? out : null;
-}
-
-interface TeetimesResponse {
-  status?: string;
-  teetimes?: Teetime[];
 }
 
 function looksBookable(t: Teetime) {
@@ -317,6 +330,35 @@ function hasPublicPrice(price: Teetime["default_price"]) {
   return true;
 }
 
+/** One validated public, bookable row — or null if anything is vague. */
+function parseRow(course: GolfCourse, date: string, t: Teetime): TeeTime | null {
+  if (!looksBookable(t) || !hasPublicPrice(t.default_price)) return null;
+  if (t.date !== date) return null;
+  const parsed = pad(t.start_time ?? "");
+  if (!parsed) return null;
+  const price = t.default_price?.green_fee ?? t.default_price?.subtotal;
+  // Skip slots with no real public price ($0 = members/affiliation-only rate).
+  if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) return null;
+  if (!Number.isInteger(t.max_player_size) || (t.max_player_size ?? 0) < 1) return null;
+  // Round length must be the exact bookable round length for this price.
+  const holes = t.default_price?.bookable_holes;
+  if (holes !== 9 && holes !== 18) return null;
+  return {
+    // Stable + unique per (course, date, round length, tee time).
+    id: `${course.id}-${date}-live-${holes}-${parsed.minutes}`,
+    courseId: course.id,
+    date,
+    time: parsed.time,
+    minutes: parsed.minutes,
+    price: Math.round(price * 100) / 100,
+    players: Math.min(t.max_player_size!, 4),
+    holes,
+    cart: Boolean(t.has_cart),
+    source: "live",
+    bookingUrl: course.bookingUrl,
+  };
+}
+
 /**
  * Pure parser: turn a Chronogolf `/teetimes` JSON response into our TeeTime
  * rows. Exported so it can be unit-tested against captured real payloads (live
@@ -331,44 +373,138 @@ export function parseTeetimesResponse(
   if (!data || data.status !== "open" || !Array.isArray(data.teetimes)) return [];
   const out: TeeTime[] = [];
   for (const t of data.teetimes) {
-    if (!looksBookable(t) || !hasPublicPrice(t.default_price)) continue;
     if (allowedCourseUuids) {
       const upstreamCourseUuid = t.course?.uuid;
       if (!upstreamCourseUuid || !allowedCourseUuids.has(upstreamCourseUuid)) continue;
     }
-    if (t.date !== date) continue;
-    const parsed = pad(t.start_time ?? "");
-    if (!parsed) continue;
-    const price = t.default_price?.green_fee ?? t.default_price?.subtotal;
-    // Skip slots with no real public price ($0 = members/affiliation-only rate).
-    if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) continue;
-    if (!Number.isInteger(t.max_player_size) || (t.max_player_size ?? 0) < 1) continue;
-    // Round length must be the exact bookable round length for this price.
-    const holes = t.default_price?.bookable_holes;
-    if (holes !== 9 && holes !== 18) continue;
-    out.push({
-      // Stable + unique per (course, date, round length, tee time).
-      id: `${course.id}-${date}-live-${holes}-${parsed.minutes}`,
-      courseId: course.id,
-      date,
-      time: parsed.time,
-      minutes: parsed.minutes,
-      price: Math.round(price * 100) / 100,
-      players: Math.min(t.max_player_size!, 4),
-      holes,
-      cart: Boolean(t.has_cart),
-      source: "live",
-      bookingUrl: course.bookingUrl,
-    });
+    const row = parseRow(course, date, t);
+    if (row) out.push(row);
   }
   return out;
 }
 
-export const liveStatus = {
-  disabled: DISABLED,
-  radiusKm: {
-    montreal: radiusForMarket("montreal"),
-    toronto: radiusForMarket("toronto"),
-  },
-  base: BASE,
-};
+/** Parse a multi-club page, mapping each row back to its club by course uuid. */
+export function parseBatchResponse(
+  byCourseUuid: ReadonlyMap<string, GolfCourse>,
+  date: string,
+  data: TeetimesResponse | null,
+): TeeTime[] {
+  if (!data || data.status !== "open" || !Array.isArray(data.teetimes)) return [];
+  const out: TeeTime[] = [];
+  for (const t of data.teetimes) {
+    const club = t.course?.uuid ? byCourseUuid.get(t.course.uuid) : undefined;
+    if (!club) continue;
+    const row = parseRow(club, date, t);
+    if (row) out.push(row);
+  }
+  return out;
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let i = 0;
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++;
+      out[idx] = await fn(items[idx]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+type BatchOutcome = { rows: TeeTime[]; answered: boolean; throttled: boolean; retryAfterSec?: number };
+
+async function fetchBatch(
+  courseUuids: string[],
+  byCourseUuid: ReadonlyMap<string, GolfCourse>,
+  date: string,
+  startTime: string,
+  endTime: string,
+  cache: { ttl: number } | "fresh",
+): Promise<BatchOutcome> {
+  const rows: TeeTime[] = [];
+  let pageSize = 0;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const res = await request<TeetimesResponse>(
+      `${BASE}/teetimes?start_date=${date}&course_ids=${courseUuids.join(",")}` +
+        `&holes=9,18&start_time=${startTime}&end_time=${endTime}&page=${page}`,
+      cache,
+    );
+    if (!res.ok) {
+      // A failed later page still leaves the earlier pages' rows usable.
+      return { rows, answered: page > 1, throttled: res.throttled, retryAfterSec: res.retryAfterSec };
+    }
+    const data = res.data;
+    if (data?.status !== "open" && data?.status !== "closed") {
+      return { rows, answered: page > 1, throttled: false };
+    }
+    rows.push(...parseBatchResponse(byCourseUuid, date, data));
+    const count = Array.isArray(data.teetimes) ? data.teetimes.length : 0;
+    if (page === 1) pageSize = count;
+    // Rows are time-sorted and end_time bounds them, so a short page is the last.
+    if (count === 0 || count < pageSize || data.status === "closed") break;
+  }
+  return { rows, answered: true, throttled: false };
+}
+
+/**
+ * Live rows for many Chronogolf clubs inside [startMin, endMin] on one date.
+ * Courses are batched into shared requests; the provider state tells the UI
+ * whether everything answered, some of it, or Chronogolf asked us to wait.
+ */
+export async function fetchChronogolfWindow(
+  courses: GolfCourse[],
+  date: string,
+  startMin: number,
+  endMin: number,
+  options: { fresh?: boolean } = {},
+): Promise<{ rows: TeeTime[]; state: ProviderState }> {
+  const bookable = courses.filter((c) => c.online && c.chronogolfSlug);
+  if (DISABLED || bookable.length === 0) {
+    return { rows: [], state: { status: DISABLED && bookable.length ? "unavailable" : "ok" } };
+  }
+
+  const byCourseUuid = new Map<string, GolfCourse>();
+  const resolved = await mapLimit(bookable, 4, async (course) => ({
+    course,
+    uuids: await getCourseUuids(course.chronogolfSlug!),
+  }));
+  let unresolved = 0;
+  for (const { course, uuids } of resolved) {
+    if (!uuids.length) unresolved++;
+    for (const uuid of uuids) byCourseUuid.set(uuid, course);
+  }
+  const allUuids = [...byCourseUuid.keys()].sort();
+  if (allUuids.length === 0) return { rows: [], state: { status: "unavailable" } };
+
+  const batches: string[][] = [];
+  for (let i = 0; i < allUuids.length; i += BATCH_SIZE) batches.push(allUuids.slice(i, i + BATCH_SIZE));
+
+  const cache = options.fresh ? ("fresh" as const) : { ttl: SHEET_TTL_S };
+  const startTime = minutesToHHMM(startMin);
+  const endTime = minutesToHHMM(endMin);
+  const outcomes = await mapLimit(batches, BATCH_CONCURRENCY, (uuids) =>
+    fetchBatch(uuids, byCourseUuid, date, startTime, endTime, cache),
+  );
+
+  const seen = new Set<string>();
+  const rows: TeeTime[] = [];
+  for (const outcome of outcomes) {
+    for (const row of outcome.rows) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+  }
+
+  const answered = outcomes.filter((o) => o.answered).length;
+  const throttled = outcomes.find((o) => o.throttled);
+  const complete = outcomes.every((o) => o.answered && !o.throttled) && unresolved === 0;
+  let state: ProviderState;
+  if (complete) state = { status: "ok" };
+  else if (throttled) {
+    state = { status: answered > 0 ? "partial" : "throttled", retryAfterSec: throttled.retryAfterSec };
+  } else state = { status: answered > 0 ? "partial" : "unavailable" };
+  return { rows, state };
+}

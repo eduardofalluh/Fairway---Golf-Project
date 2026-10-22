@@ -1,16 +1,17 @@
 import { EXTRA_COURSES } from "./courses";
-import {
-  fetchCourseTeeTimes,
-  getChronogolfCourses,
-} from "./providers/chronogolf";
-import { fetchTeeTimeCourseTeeTimes } from "./providers/teetime";
-import type { GolfCourse, MarketId, SearchQuery, TeeTime, TeeTimeResult } from "./types";
-import { todayISO } from "./format";
-
-export function parseTimeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
+import { fetchChronogolfWindow, getChronogolfCourses } from "./providers/chronogolf";
+import { fetchTeeTimeWindow } from "./providers/teetime";
+import { parseTimeToMinutes } from "./format";
+import type { RangeQuery } from "./search-query";
+import type {
+  GolfCourse,
+  MarketId,
+  ProviderId,
+  ProviderState,
+  TeeTime,
+  TeeTimePartResponse,
+  WindowQuery,
+} from "./types";
 
 /**
  * Deep link straight to the course's booking page, pre-set to the chosen date
@@ -69,184 +70,69 @@ export async function getDirectory(market: MarketId = "montreal"): Promise<GolfC
   return [...directory, ...extras].sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
-/** Apply course-level filters BEFORE fetching tee times to limit live calls. */
-function preFilterCourses(courses: GolfCourse[], q: SearchQuery): GolfCourse[] {
-  return courses.filter((c) => {
-    if (q.publicOnly && c.access !== "public") return false;
-    if (q.regions && q.regions.length && !q.regions.includes(c.region)) return false;
-    if (typeof q.maxDistanceKm === "number" && c.distanceKm > q.maxDistanceKm)
-      return false;
-    if (q.holes && q.holes !== "any") {
-      const wants = q.holes;
-      const ok = c.holes.some((h) => (wants === 18 ? h >= 18 : h === 9));
-      if (!ok) return false;
-    }
-    return true;
-  });
+export async function findCourse(market: MarketId, courseId: string): Promise<GolfCourse | null> {
+  const directory = await getDirectory(market);
+  return directory.find((course) => course.id === courseId) ?? null;
 }
 
-const concurrency = 8;
-
-async function mapLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let i = 0;
-  async function worker() {
-    while (i < items.length) {
-      const idx = i++;
-      out[idx] = await fn(items[idx]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
+/** Courses with a live feed Fairway can read, in a stable order. */
+function liveFeedCourses(directory: GolfCourse[]): GolfCourse[] {
+  return directory
+    .filter((c) => c.online && (c.chronogolfSlug || c.teeTimeSlug))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
-/**
- * Gather tee times for a date across the pre-filtered courses. Fairway only
- * returns provider-confirmed live rows; unavailable feeds or closed sheets add
- * no rows rather than generating prices.
- */
-async function gatherTeeTimes(
-  courses: GolfCourse[],
-  date: string,
-): Promise<TeeTime[]> {
-  const perCourse = await mapLimit(courses, concurrency, async (course) => {
-    let live: TeeTime[] | null = null;
-    if (course.online && course.chronogolfUuid) {
-      try {
-        live = await fetchCourseTeeTimes(course, date);
-      } catch {
-        live = null;
-      }
-    }
-    if (course.online && course.teeTimeSlug) {
-      try {
-        live = await fetchTeeTimeCourseTeeTimes(course, date);
-      } catch {
-        live = null;
-      }
-    }
-    return live ?? [];
-  });
-  return perCourse.flat();
+/** Round-robin split so every part covers a similar mix of near and far courses. */
+export function coursesForPart(courses: GolfCourse[], part: number, parts: number): GolfCourse[] {
+  return courses.filter((_, index) => index % parts === part);
 }
 
-export function applySearch(
-  teeTimes: TeeTime[],
-  byId: Map<string, GolfCourse>,
-  query: SearchQuery,
-): TeeTimeResult[] {
+export function windowBounds(query: Pick<WindowQuery, "desiredTime" | "windowMinutes">) {
   const desired = parseTimeToMinutes(query.desiredTime);
-  const window = query.windowMinutes;
-  const results: TeeTimeResult[] = [];
-  const today = todayISO();
-  const localTime = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).format(new Date());
-  const currentMinutes = parseTimeToMinutes(localTime);
-
-  for (const t of teeTimes) {
-    if (t.date !== query.date) continue;
-    if (t.date < today || (t.date === today && t.minutes <= currentMinutes)) continue;
-    if (Math.abs(t.minutes - desired) > window) continue;
-    if (t.players < query.players) continue;
-    if (query.holes && query.holes !== "any") {
-      if (query.holes === 18 ? t.holes < 18 : t.holes !== 9) continue;
-    }
-    if (typeof query.maxPrice === "number" && t.price > query.maxPrice) continue;
-    if (typeof query.minPrice === "number" && t.price < query.minPrice) continue;
-    if (query.cartOnly && !t.cart) continue;
-    if (t.source !== "live") continue;
-
-    const course = byId.get(t.courseId);
-    if (!course) continue;
-
-    results.push({
-      ...t,
-      bookingUrl: deepBookingUrl(course, t.date, t.holes),
-      course,
-      deltaMinutes: Math.abs(t.minutes - desired),
-    });
-  }
-
-  return sortResults(results, query);
-}
-
-function sortResults(results: TeeTimeResult[], query: SearchQuery): TeeTimeResult[] {
-  const sort =
-    query.sort ?? (query.targetPrice != null ? "closest-price" : "price-desc");
-  const byTimeThenPrice = (a: TeeTimeResult, b: TeeTimeResult) =>
-    a.deltaMinutes - b.deltaMinutes || a.price - b.price;
-
-  switch (sort) {
-    case "price-desc":
-      return results.sort((a, b) => b.price - a.price || byTimeThenPrice(a, b));
-    case "price-asc":
-      return results.sort((a, b) => a.price - b.price || byTimeThenPrice(a, b));
-    case "closest-time":
-      return results.sort(byTimeThenPrice);
-    case "distance":
-      return results.sort(
-        (a, b) => a.course.distanceKm - b.course.distanceKm || byTimeThenPrice(a, b),
-      );
-    case "closest-price": {
-      const target = query.targetPrice ?? 0;
-      return results.sort(
-        (a, b) =>
-          Math.abs(a.price - target) - Math.abs(b.price - target) ||
-          a.deltaMinutes - b.deltaMinutes,
-      );
-    }
-    default:
-      return results;
-  }
-}
-
-export interface SearchResponse {
-  results: TeeTimeResult[];
-  fallbackCourses: GolfCourse[];
-  meta: {
-    total: number;
-    courses: number;
-    cheapest: number | null;
-    priciest: number | null;
-    liveRows: number;
-    liveCourses: number;
-    directorySize: number;
-    date: string;
+  return {
+    startMin: Math.max(0, desired - query.windowMinutes),
+    endMin: Math.min(23 * 60 + 59, desired + query.windowMinutes),
   };
 }
 
-export async function search(query: SearchQuery): Promise<SearchResponse> {
-  const directory = await getDirectory(query.market ?? "montreal");
-  const byId = new Map(directory.map((c) => [c.id, c]));
-  const candidates = preFilterCourses(directory, query);
-  const teeTimes = await gatherTeeTimes(candidates, query.date);
-  const results = applySearch(teeTimes, byId, query);
-  const fallbackCourses = results.length === 0
-    ? candidates.filter((course) => course.online || course.bookingUrl).slice(0, 60)
-    : [];
+/**
+ * One slice of a market search over a minute range. The browser asks for every
+ * part in parallel, renders each as it lands, and only asks for minutes it has
+ * not already loaded; identical ranges share cached provider pages.
+ */
+export async function searchPart(query: RangeQuery): Promise<TeeTimePartResponse> {
+  const directory = await getDirectory(query.market);
+  const courses = coursesForPart(liveFeedCourses(directory), query.part, query.parts);
+  const { startMin, endMin } = query;
+  const byId = new Map(courses.map((c) => [c.id, c]));
 
-  const prices = results.map((r) => r.price);
-  const liveCourseIds = new Set(
-    results.filter((r) => r.source === "live").map((r) => r.courseId),
-  );
+  const [chronogolf, teetime] = await Promise.all([
+    fetchChronogolfWindow(courses.filter((c) => c.source === "chronogolf"), query.date, startMin, endMin),
+    fetchTeeTimeWindow(courses.filter((c) => c.source === "teetime"), query.date, startMin, endMin),
+  ]);
+
+  const providers: Partial<Record<ProviderId, ProviderState>> = {};
+  if (courses.some((c) => c.source === "chronogolf")) providers.chronogolf = chronogolf.state;
+  if (courses.some((c) => c.source === "teetime")) providers.teetime = teetime.state;
+
+  const teeTimes: TeeTime[] = [];
+  for (const row of [...chronogolf.rows, ...teetime.rows]) {
+    const course = byId.get(row.courseId);
+    if (!course || row.date !== query.date) continue;
+    if (row.minutes < startMin || row.minutes > endMin) continue;
+    teeTimes.push({ ...row, bookingUrl: deepBookingUrl(course, row.date, row.holes) });
+  }
+  teeTimes.sort((a, b) => a.minutes - b.minutes || a.price - b.price);
 
   return {
-    results,
-    fallbackCourses,
-    meta: {
-      total: results.length,
-      courses: new Set(results.map((r) => r.courseId)).size,
-      cheapest: prices.length ? Math.min(...prices) : null,
-      priciest: prices.length ? Math.max(...prices) : null,
-      liveRows: results.filter((r) => r.source === "live").length,
-      liveCourses: liveCourseIds.size,
-      directorySize: directory.length,
-      date: query.date,
-    },
+    market: query.market,
+    date: query.date,
+    startMin,
+    endMin,
+    part: query.part,
+    parts: query.parts,
+    checkedCourses: courses.length,
+    teeTimes,
+    providers,
   };
 }

@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import type { Map as LMap, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { safeBookingUrl } from "@/lib/providers/config";
 import { useLanguage } from "@/lib/i18n";
 
 export type MapCourse = {
@@ -17,7 +16,6 @@ export type MapCourse = {
   holes: number;
   distanceKm: number | null; // from the user (null if location unknown)
   driveMin: number | null;
-  bookingUrl: string;
 };
 
 /**
@@ -25,15 +23,22 @@ export type MapCourse = {
  * Renders the user's location (blue dot) when known and fits the view to
  * everything. Client-only (dynamic import), uses free OpenStreetMap tiles
  * (no API key), and circleMarkers so there are no marker-image assets to bundle.
+ * A popup opens the same verified booking sheet as the list, never a raw link.
  */
 export function CourseMap({
   courses,
   user,
+  onPick,
 }: {
   courses: MapCourse[];
   user: { lat: number; lng: number } | null;
+  onPick: (courseId: string) => void;
 }) {
   const { lang } = useLanguage();
+  const onPickRef = useRef(onPick);
+  useEffect(() => {
+    onPickRef.current = onPick;
+  }, [onPick]);
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
@@ -64,10 +69,10 @@ export function CourseMap({
       for (const c of courses) {
         if (typeof c.lat !== "number" || typeof c.lng !== "number") continue;
         const marker = L.circleMarker([c.lat, c.lng], {
-          radius: 9,
-          color: "#07110b",
-          weight: 1.5,
-          fillColor: "#c6f24a",
+          radius: 10,
+          color: "#0b2d20",
+          weight: 2,
+          fillColor: "#caec55",
           fillOpacity: 0.95,
         }).addTo(group);
         const popup = document.createElement("div");
@@ -75,7 +80,8 @@ export function CourseMap({
         const name = document.createElement("strong");
         name.textContent = c.name;
         const detail = document.createElement("p");
-        detail.textContent = `${lang === "fr" ? "Direct" : "Live"} · ${c.time} · ${c.holes} ${lang === "fr" ? "trous" : "holes"} · $${c.price} CAD`;
+        detail.style.cssText = "margin:4px 0";
+        detail.textContent = `${lang === "fr" ? "Direct" : "Live"} · ${c.time} · ${c.holes} ${lang === "fr" ? "trous" : "holes"} · $${c.price}`;
         popup.append(name, detail);
         if (c.distanceKm != null) {
           const distance = document.createElement("p");
@@ -84,16 +90,13 @@ export function CourseMap({
             : `${c.distanceKm} km · ~${c.driveMin} min drive from you`;
           popup.append(distance);
         }
-        const bookingUrl = safeBookingUrl(c.bookingUrl);
-        if (bookingUrl) {
-          const link = document.createElement("a");
-          link.href = bookingUrl;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.style.cssText = "color:#174b36;font-weight:600";
-          link.textContent = lang === "fr" ? "Continuer chez le fournisseur →" : "Continue to provider →";
-          popup.append(link);
-        }
+        const pick = document.createElement("button");
+        pick.type = "button";
+        pick.style.cssText =
+          "margin-top:6px;border:0;border-radius:10px;background:#0b2d20;color:#fff;font-weight:700;padding:8px 12px;cursor:pointer";
+        pick.textContent = lang === "fr" ? "Voir et réserver →" : "Review & book →";
+        pick.addEventListener("click", () => onPickRef.current(c.id));
+        popup.append(pick);
         marker.bindPopup(popup);
         bounds.push([c.lat, c.lng]);
       }
@@ -135,8 +138,7 @@ export function CourseMap({
   return (
     <div
       ref={elRef}
-      className="h-[360px] w-full overflow-hidden rounded-2xl border border-line sm:h-[520px] sm:rounded-3xl"
-      style={{ background: "#0f2117" }}
+      className="h-[420px] w-full overflow-hidden rounded-[1.75rem] border border-line bg-base-2 shadow-[var(--shadow-soft)] sm:h-[560px]"
     />
   );
 }

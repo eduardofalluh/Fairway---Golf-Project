@@ -1,48 +1,238 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseSearchQuery } from '../src/lib/search-query';
-import { applySearch, search } from '../src/lib/aggregator';
-import { parseTeetimesResponse } from '../src/lib/providers/chronogolf';
+import { parseRangeQuery } from '../src/lib/search-query';
+import { missingRanges } from '../src/lib/useTeeTimeSearch';
+import { searchPart } from '../src/lib/aggregator';
+import { fetchChronogolfWindow, parseBatchResponse, parseTeetimesResponse } from '../src/lib/providers/chronogolf';
 import { fetchTeeTimeCourseTeeTimes } from '../src/lib/providers/teetime';
-import type { GolfCourse, TeeTime } from '../src/lib/types';
+import { filterTeeTimes, groupByCourse, mergeProviderStates, timeBuckets } from '../src/lib/results';
+import { GET } from '../src/app/api/tee-times/route';
+import { addDaysISO, todayISO } from '../src/lib/format';
+import type { GolfCourse, SearchFilters, TeeTime } from '../src/lib/types';
+import { dorvalClub, fakeChronogolf, row, stRoseClub } from './helpers';
 
-const params = (extra = '') => new URLSearchParams(`date=2099-07-10&time=13:00&${extra}`);
 const course: GolfCourse = { id: 'test', market: 'montreal', name: 'Test course', city: 'Laval', region: 'Laval', holes: [18], distanceKm: 10, lat: 45.6, lng: -73.7, source: 'chronogolf', online: true, access: 'public', bookingUrl: 'https://www.chronogolf.com/club/test' };
+const today = '2099-07-01';
+const date = '2099-07-10';
+const params = (extra = '') => new URLSearchParams(`date=${date}&start=12:00&end=14:00&${extra}`);
+const range = (startMin = 720, endMin = 840, part = 0, parts = 1) => ({ market: 'montreal' as const, date, startMin, endMin, part, parts });
+const filters = (extra: Partial<SearchFilters> = {}): SearchFilters => ({
+  players: 2, holes: 'any', regions: [], cartOnly: false, publicOnly: false, sort: 'closest-time', ...extra,
+});
+const ctx = { date, desiredTime: '13:00', windowMinutes: 60, today, nowMinutes: 0 };
+const tee = (extra: Partial<TeeTime> = {}): TeeTime => ({
+  id: 'a', courseId: 'test', date, time: '13:00', minutes: 780, price: 60.5, players: 4,
+  holes: 18, cart: false, source: 'live', bookingUrl: course.bookingUrl, ...extra,
+});
 
-test('search defaults to real availability and lowest price', () => {
-  const q = parseSearchQuery(params());
-  assert.equal(q.liveOnly, true); assert.equal(q.sort, 'price-asc');
-  assert.equal(q.market, 'montreal');
-  assert.equal(parseSearchQuery(params('live=0')).liveOnly, true);
+test('range queries default to one part and echo minutes', () => {
+  const q = parseRangeQuery(params(), today);
+  assert.deepEqual([q.market, q.startMin, q.endMin, q.part, q.parts], ['montreal', 720, 840, 0, 1]);
+  assert.equal(parseRangeQuery(params('market=toronto&part=3&parts=4'), today).part, 3);
 });
-test('accepts Toronto market and rejects cross-market regions', () => {
-  const toronto = parseSearchQuery(params('market=toronto&regions=North+GTA,East+GTA'));
-  assert.equal(toronto.market, 'toronto');
-  assert.deepEqual(toronto.regions, ['North GTA', 'East GTA']);
-  assert.throws(() => parseSearchQuery(params('market=toronto&regions=Laval')));
-  assert.throws(() => parseSearchQuery(params('market=vancouver')));
+
+test('range queries reject bad calendars, past or far dates, times, spans and parts', () => {
+  for (const suffix of ['date=2099-02-30', 'date=2099-06-30', 'date=2099-12-01', 'start=25:99', 'end=11:00', 'end=19:01', 'market=vancouver', 'part=4&parts=4', 'parts=9', 'part=1.5&parts=4']) {
+    const p = params(); for (const [key, value] of new URLSearchParams(suffix)) p.set(key, value);
+    assert.throws(() => parseRangeQuery(p, today), suffix);
+  }
+  const at = (start: string, end: string) => new URLSearchParams({ date, start, end });
+  assert.equal(parseRangeQuery(at('13:00', '13:00'), today).endMin, 780);
+  assert.equal(parseRangeQuery(at('08:00', '14:00'), today).startMin, 480);
 });
-test('rejects invalid calendars, times, budgets and player counts', () => {
-  for (const suffix of ['date=2026-02-30', 'time=25:99', 'players=NaN', 'players=5', 'players=1.5', 'window=-1', 'max=Infinity', 'min=100&max=50', 'regions=Unknown', 'holes=27', 'sort=anything']) {
-    const p = params(); for (const [key,value] of new URLSearchParams(suffix)) p.set(key,value);
-    assert.throws(() => parseSearchQuery(p), suffix);
+
+test('only minutes not yet loaded are fetched again', () => {
+  assert.deepEqual(missingRanges(720, 840, []), [[720, 840]]);
+  assert.deepEqual(missingRanges(720, 840, [{ start: 720, end: 840 }]), []);
+  assert.deepEqual(missingRanges(780, 900, [{ start: 720, end: 840 }]), [[841, 900]]);
+  assert.deepEqual(missingRanges(660, 900, [{ start: 720, end: 840 }]), [[660, 719], [841, 900]]);
+  assert.deepEqual(missingRanges(600, 960, [{ start: 600, end: 700 }, { start: 800, end: 960 }]), [[701, 799]]);
+});
+
+test('browser filters drop estimates, past, full, off-window and over-budget slots', () => {
+  const byId = new Map([[course.id, course]]);
+  const rows = [
+    tee(), tee({ id: 'b', price: 50.25 }), tee({ id: 'estimate', source: 'estimate' }),
+    tee({ id: 'full', players: 1 }), tee({ id: 'late', minutes: 1000, time: '16:40' }),
+    tee({ id: 'pricey', price: 141 }), tee({ id: 'wrong-day', date: '2099-07-11' }),
+  ];
+  const result = filterTeeTimes(rows, byId, filters({ sort: 'price-asc', maxPrice: 140 }), ctx);
+  assert.deepEqual(result.map((x) => x.id), ['b', 'a']);
+  const past = filterTeeTimes([tee()], byId, filters(), { ...ctx, today: date, nowMinutes: 800 });
+  assert.deepEqual(past, []);
+});
+
+test('price, cart, holes, region, public and slice bounds are inclusive and exact', () => {
+  const privateCourse = { ...course, id: 'private', access: 'private' as const, region: 'North Shore' as const };
+  const byId = new Map([[course.id, course], [privateCourse.id, privateCourse]]);
+  const rows = [
+    tee({ id: 'cart', cart: true, price: 80 }), tee({ id: 'nine', holes: 9, price: 40 }),
+    tee({ id: 'private', courseId: 'private' }), tee({ id: 'edge', minutes: 840, time: '14:00' }),
+  ];
+  const ids = (f: Partial<SearchFilters>) => filterTeeTimes(rows, byId, filters(f), ctx).map((r) => r.id).sort();
+  assert.deepEqual(ids({ cartOnly: true }), ['cart']);
+  assert.deepEqual(ids({ holes: 9 }), ['nine']);
+  assert.deepEqual(ids({ minPrice: 80, maxPrice: 80 }), ['cart']);
+  assert.deepEqual(ids({ publicOnly: true }), ['cart', 'edge', 'nine']);
+  assert.deepEqual(ids({ regions: ['North Shore'] }), ['private']);
+  assert.deepEqual(ids({ slice: [840, 854] }), ['edge']);
+});
+
+test('sorts by time, budget fit and distance from the golfer', () => {
+  const near = { ...course, id: 'near', distanceKm: 5, lat: 45.5, lng: -73.6 };
+  const far = { ...course, id: 'far', distanceKm: 20, lat: 46.2, lng: -74.5 };
+  const byId = new Map([[near.id, near], [far.id, far]]);
+  const rows = [tee({ id: 'far-early', courseId: 'far', price: 59, minutes: 770 }), tee({ id: 'near-late', courseId: 'near', price: 80, minutes: 800 })];
+  const order = (f: Partial<SearchFilters>, extra = {}) => filterTeeTimes(rows, byId, filters(f), { ...ctx, ...extra }).map((r) => r.id);
+  assert.deepEqual(order({ sort: 'closest-time' }), ['far-early', 'near-late']);
+  assert.deepEqual(order({ sort: 'distance' }), ['near-late', 'far-early']);
+  assert.deepEqual(order({ sort: 'distance' }, { userLoc: { lat: 46.2, lng: -74.5 } }), ['far-early', 'near-late']);
+  assert.deepEqual(order({ sort: 'closest-price', targetPrice: 78 }), ['near-late', 'far-early']);
+  assert.deepEqual(order({ sort: 'price-desc' }), ['near-late', 'far-early']);
+});
+
+test('course groups keep ranked order with chronological slots; buckets count the window', () => {
+  const other = { ...course, id: 'other' };
+  const byId = new Map([[course.id, course], [other.id, other]]);
+  const rows = [tee({ id: 'x2', minutes: 790, time: '13:10', price: 30 }), tee({ id: 'o1', courseId: 'other', price: 20 }), tee({ id: 'x1', minutes: 730, time: '12:10', price: 40 })];
+  const sorted = filterTeeTimes(rows, byId, filters({ sort: 'price-asc' }), ctx);
+  const groups = groupByCourse(sorted);
+  assert.deepEqual(groups.map((g) => g.course.id), ['other', 'test']);
+  assert.deepEqual(groups[1].slots.map((s) => s.id), ['x1', 'x2']);
+  assert.deepEqual([groups[1].minPrice, groups[1].maxPrice], [30, 40]);
+  const buckets = timeBuckets(sorted, 720, 840);
+  assert.equal(buckets.length, 9);
+  assert.equal(buckets.reduce((n, b) => n + b.count, 0), 3);
+  assert.equal(buckets[0].count, 1);
+});
+
+test('provider states merge to the worst honest summary', () => {
+  assert.deepEqual(mergeProviderStates([{ status: 'ok' }, { status: 'ok' }]), { status: 'ok' });
+  assert.equal(mergeProviderStates([{ status: 'ok' }, { status: 'throttled', retryAfterSec: 20 }])?.status, 'partial');
+  assert.deepEqual(mergeProviderStates([{ status: 'throttled', retryAfterSec: 9 }, { status: 'throttled', retryAfterSec: 20 }]), { status: 'throttled', retryAfterSec: 20 });
+  assert.equal(mergeProviderStates([]), null);
+});
+
+test('batched pages map each row back to its club by course uuid', () => {
+  const dorval = { ...course, id: 'dorval' };
+  const byUuid = new Map([['course-dorval-a', dorval], ['course-dorval-b', dorval], ['course-st-rose', course]]);
+  const rows = parseBatchResponse(byUuid, date, { status: 'open', teetimes: [
+    row('course-dorval-b', date, '12:10'), row('course-st-rose', date, '12:20', 55), row('unknown', date, '12:30'),
+  ] });
+  assert.deepEqual(rows.map((r) => [r.courseId, r.time, r.price]), [['dorval', '12:10', 72], ['test', '12:20', 55]]);
+});
+
+test('a search asks only for the time window and batches clubs into shared requests', async () => {
+  const pages: Record<string, unknown[]> = {
+    '1': Array.from({ length: 24 }, (_, i) => row(i % 2 ? 'course-dorval-a' : 'course-st-rose', date, `12:${String(i * 2).padStart(2, '0')}`)),
+    '2': [row('course-dorval-b', date, '13:50')],
+  };
+  const fake = fakeChronogolf({
+    clubs: [stRoseClub, dorvalClub],
+    teetimes: (url) => Response.json({ status: 'open', teetimes: pages[url.searchParams.get('page')!] ?? [] }),
+  });
+  try {
+    const result = await searchPart(range());
+    const sheets = fake.sheetCalls().map((c) => new URL(c));
+    assert.equal(sheets.length, 2, 'one batch, two pages, then stop on the short page');
+    assert.equal(sheets[0].searchParams.get('start_time'), '12:00');
+    assert.equal(sheets[0].searchParams.get('end_time'), '14:00');
+    assert.deepEqual(sheets[0].searchParams.get('course_ids')!.split(',').sort(), ['course-dorval-a', 'course-dorval-b', 'course-st-rose']);
+    assert.equal(result.providers.chronogolf?.status, 'ok');
+    assert.equal(result.teeTimes.length, 25);
+    assert.ok(result.teeTimes.every((t) => t.bookingUrl.includes(`date=${date}`)));
+  } finally {
+    fake.restore();
   }
 });
-test('accepts inclusive numeric filter bounds', () => {
-  const low = parseSearchQuery(params('window=0&players=1&min=0&max=0&target=0&distance=0'));
-  assert.deepEqual(
-    [low.windowMinutes, low.players, low.minPrice, low.maxPrice, low.targetPrice, low.maxDistanceKm],
-    [0, 1, 0, 0, 0, 0],
-  );
-  const high = parseSearchQuery(params('window=180&players=4&min=1000&max=1000&target=1000&distance=500'));
-  assert.deepEqual(
-    [high.windowMinutes, high.players, high.minPrice, high.maxPrice, high.targetPrice, high.maxDistanceKm],
-    [180, 4, 1000, 1000, 1000, 500],
-  );
+
+test('parts split the market so their union covers every live course once', async () => {
+  const fake = fakeChronogolf({
+    clubs: [stRoseClub, dorvalClub],
+    teetimes: (url) => Response.json({ status: 'open', teetimes: url.searchParams.get('course_ids')!.split(',').map((id) => row(id, date, '13:00')) }),
+  });
+  try {
+    const parts = await Promise.all([0, 1].map((part) => searchPart(range(750, 810, part, 2))));
+    const courses = parts.flatMap((p) => p.teeTimes.map((t) => t.courseId)).sort();
+    assert.deepEqual(courses, ['club-dorval', 'club-st-rose']);
+    assert.ok(parts.every((p) => p.checkedCourses === 1));
+  } finally {
+    fake.restore();
+  }
 });
+
+test('a 429 marks Chronogolf as throttled and stops further calls until it clears', async () => {
+  const fake = fakeChronogolf({
+    teetimes: () => new Response('slow down', { status: 429, headers: { 'Retry-After': '30' } }),
+  });
+  try {
+    const first = await searchPart(range());
+    assert.deepEqual(first.providers.chronogolf, { status: 'throttled', retryAfterSec: 30 });
+    assert.deepEqual(first.teeTimes, []);
+    const before = fake.sheetCalls().length;
+    const second = await searchPart(range(840, 960));
+    assert.equal(second.providers.chronogolf?.status, 'throttled');
+    assert.equal(fake.sheetCalls().length, before, 'no upstream call while blocked');
+  } finally {
+    fake.restore();
+  }
+});
+
+test('a throttled later page keeps the rows already read and reports partial', async () => {
+  const fake = fakeChronogolf({
+    teetimes: (url) => url.searchParams.get('page') === '1'
+      ? Response.json({ status: 'open', teetimes: Array.from({ length: 24 }, () => row('course-st-rose', date, '12:30')) })
+      : new Response('slow down', { status: 429, headers: { 'Retry-After': '60' } }),
+  });
+  try {
+    const result = await fetchChronogolfWindow(
+      [{ ...course, id: 'club-st-rose', chronogolfSlug: 'golf-sainte-rose' }], date, 720, 840,
+    );
+    assert.equal(result.state.status, 'partial');
+    assert.equal(result.rows.length, 1, 'duplicate slots collapse to one row');
+  } finally {
+    fake.restore();
+  }
+});
+
+test('an open but empty sheet or an outage never invents availability', async () => {
+  for (const teetimes of [() => Response.json({ status: 'open', teetimes: [] }), () => new Response('down', { status: 503 })]) {
+    const fake = fakeChronogolf({ teetimes });
+    try {
+      const result = await searchPart(range());
+      assert.deepEqual(result.teeTimes, []);
+    } finally {
+      fake.restore();
+    }
+  }
+});
+
+test('complete answers are CDN-cacheable; throttled ones never are', async () => {
+  const tomorrow = addDaysISO(todayISO(), 1);
+  const url = `http://localhost/api/tee-times?market=montreal&date=${tomorrow}&start=12:00&end=14:00&part=0&parts=1`;
+  let fake = fakeChronogolf({ teetimes: () => Response.json({ status: 'open', teetimes: [row('course-st-rose', tomorrow, '13:00')] }) });
+  try {
+    const ok = await GET(new Request(url, { headers: { 'x-forwarded-for': '10.0.0.1' } }));
+    assert.equal(ok.status, 200);
+    assert.match(ok.headers.get('Netlify-CDN-Cache-Control') ?? '', /s-maxage=90/);
+    assert.equal((await ok.json()).teeTimes.length, 1);
+  } finally {
+    fake.restore();
+  }
+  fake = fakeChronogolf({ teetimes: () => new Response('slow down', { status: 429 }) });
+  try {
+    const throttled = await GET(new Request(url, { headers: { 'x-forwarded-for': '10.0.0.2' } }));
+    assert.equal(throttled.headers.get('Cache-Control'), 'no-store');
+    assert.equal(throttled.headers.get('Netlify-CDN-Cache-Control'), null);
+  } finally {
+    fake.restore();
+  }
+  assert.equal((await GET(new Request('http://localhost/api/tee-times?date=nope&start=13:00&end=14:00'))).status, 400);
+});
+
 test('preserves cents and rejects unavailable or mismatched live inventory', () => {
-  const good = { start_time: '13:00', date: '2099-07-10', max_player_size: 2, default_price: { green_fee: 55.75, bookable_holes: 18 } };
-  const rows = parseTeetimesResponse(course, '2099-07-10', { status: 'open', teetimes: [
+  const good = { start_time: '13:00', date: date, max_player_size: 2, default_price: { green_fee: 55.75, bookable_holes: 18 } };
+  const rows = parseTeetimesResponse(course, date, { status: 'open', teetimes: [
     good,
     {...good, max_player_size: 0},
     {...good, max_player_size: undefined},
@@ -55,121 +245,6 @@ test('preserves cents and rejects unavailable or mismatched live inventory', () 
   ] });
   assert.equal(rows.length, 1); assert.equal(rows[0].price, 55.75);
 });
-test('filters generated estimates, capacity, time and sorts comparable prices', () => {
-  const base: TeeTime = { id:'a',courseId:'test',date:'2099-07-10',time:'13:00',minutes:780,price:60.5,players:4,holes:18,cart:false,source:'live',bookingUrl:course.bookingUrl };
-  const rows = [base,{...base,id:'b',price:50.25},{...base,id:'estimate',source:'estimate' as const},{...base,id:'full',players:1},{...base,id:'late',minutes:1000}];
-  const result=applySearch(rows,new Map([[course.id,course]]),parseSearchQuery(params()));
-  assert.deepEqual(result.map(x=>x.id),['b','a']);
-});
-test('supports explicit distance and closest-price ordering after filters', () => {
-  const near = { ...course, id: 'near', distanceKm: 5 };
-  const far = { ...course, id: 'far', distanceKm: 20 };
-  const row = (id: string, courseId: string, price: number): TeeTime => ({
-    id, courseId, date: '2099-07-10', time: '13:00', minutes: 780,
-    price, players: 4, holes: 18, cart: false, source: 'live', bookingUrl: course.bookingUrl,
-  });
-  const byId = new Map([[near.id, near], [far.id, far]]);
-  const rows = [row('far-price', far.id, 59), row('near-price', near.id, 80)];
-  const base = parseSearchQuery(params('live=0&max=80'));
-  assert.equal(base.liveOnly, true);
-  assert.deepEqual(applySearch(rows, byId, { ...base, sort: 'distance' }).map(r => r.id), ['near-price', 'far-price']);
-  assert.deepEqual(applySearch(rows, byId, { ...base, sort: 'closest-price', targetPrice: 60 }).map(r => r.id), ['far-price', 'near-price']);
-});
-test('never returns inventory from a different date than the request', () => {
-  const row: TeeTime = { id:'wrong-day',courseId:'test',date:'2099-07-11',time:'13:00',minutes:780,price:50,players:4,holes:18,cart:false,source:'live',bookingUrl:course.bookingUrl };
-  const result = applySearch([row], new Map([[course.id, course]]), parseSearchQuery(params()));
-  assert.deepEqual(result, []);
-});
-test('price, cart, holes and time bounds are inclusive', () => {
-  const base: TeeTime = { id:'boundary',courseId:'test',date:'2099-07-10',time:'14:00',minutes:840,price:50,players:2,holes:18,cart:true,source:'live',bookingUrl:course.bookingUrl };
-  const query = parseSearchQuery(params('window=60&players=2&holes=18&min=50&max=50&cart=1'));
-  assert.deepEqual(applySearch([base], new Map([[course.id, course]]), query).map((r) => r.id), ['boundary']);
-});
-test('an explicitly open but empty provider sheet does not become invented availability', async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input) => {
-    const url = String(input);
-    if (url.includes('/marketplace/v2/search?')) {
-      return Response.json([{
-        uuid: 'mock-club', name: 'Mock Club', slug: 'mock-club', holes: [18],
-        city: 'Laval', province: 'QC', country: 'Canada',
-        weekday_price: 60, weekend_price: 70,
-        location: { lat: 45.6, lon: -73.7 }, online_booking_enabled: true,
-      }]);
-    }
-    if (url.includes('/marketplace/v2/clubs/mock-club')) {
-      return Response.json({ courses: [{ uuid: 'mock-course', holes: 18 }] });
-    }
-    if (url.includes('/marketplace/v2/teetimes?')) {
-      return Response.json({ status: 'open', teetimes: [] });
-    }
-    throw new Error(`Unexpected fetch: ${url}`);
-  }) as typeof fetch;
-  try {
-    const response = await search(parseSearchQuery(params('live=0&players=1&window=180&max=1000')));
-    assert.equal(response.results.filter((row) => row.courseId === 'mock-club').length, 0);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test('provider outages never become generated tee times or mock prices', async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input) => {
-    const url = String(input);
-    if (url.includes('/marketplace/v2/search?')) {
-      return Response.json([{
-        uuid: 'st-rose', name: 'Golf Sainte-Rose', slug: 'golf-sainte-rose', holes: [18],
-        city: 'Laval', province: 'QC', country: 'Canada', weekday_price: 90, weekend_price: 110,
-        location: { lat: 45.61, lon: -73.78 }, online_booking_enabled: true,
-      }]);
-    }
-    if (url.includes('/marketplace/v2/clubs/golf-sainte-rose')) {
-      return Response.json({ courses: [{ uuid: 'course-st-rose', holes: 18 }] });
-    }
-    if (url.includes('/marketplace/v2/teetimes?')) {
-      return Response.json({ status: 'closed', teetimes: [] });
-    }
-    throw new Error(`Unexpected fetch: ${url}`);
-  }) as typeof fetch;
-  try {
-    const response = await search(parseSearchQuery(params('live=0&players=1&window=180&max=1000')));
-    assert.equal(response.results.length, 0);
-    assert.equal(response.meta.cheapest, null);
-    assert.equal(response.meta.liveRows, 0);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-test('TeeTime search results preserve provider date handoff', () => {
-  const teetimeCourse: GolfCourse = {
-    ...course,
-    id: 'extra-kirby-links-golf-course',
-    market: 'toronto',
-    name: 'Kirby Links Golf Course',
-    city: 'Maple',
-    region: 'North GTA',
-    source: 'teetime',
-    teeTimeSlug: 'kirby-links-golf-course',
-    bookingUrl: 'https://tee-time.com/clubs/kirby-links-golf-course',
-  };
-  const row: TeeTime = {
-    id: 'kirby-1300',
-    courseId: teetimeCourse.id,
-    date: '2099-07-10',
-    time: '13:00',
-    minutes: 780,
-    price: 35,
-    players: 4,
-    holes: 18,
-    cart: false,
-    source: 'live',
-    bookingUrl: 'https://tee-time.com/clubs/kirby-links-golf-course?date=2099-07-10',
-  };
-  const result = applySearch([row], new Map([[teetimeCourse.id, teetimeCourse]]), parseSearchQuery(params('market=toronto&live=1')));
-  assert.equal(result[0]?.bookingUrl, 'https://tee-time.com/clubs/kirby-links-golf-course?date=2099-07-10');
-});
-
 test('TeeTime pages parse into live GTA tee times', async () => {
   const originalFetch = globalThis.fetch;
   const torontoCourse: GolfCourse = {
@@ -209,7 +284,7 @@ test('TeeTime pages parse into live GTA tee times', async () => {
     { status: 200, headers: { 'content-type': 'text/html' } },
   )) as typeof fetch;
   try {
-    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, '2099-07-10');
+    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, date);
     assert.equal(rows?.length, 1);
     assert.equal(rows?.[0].source, 'live');
     assert.equal(rows?.[0].time, '13:04');
@@ -219,15 +294,9 @@ test('TeeTime pages parse into live GTA tee times', async () => {
     globalThis.fetch = originalFetch;
   }
 });
-test('past tee times cannot appear as bookable inventory', () => {
-  const row: TeeTime = { id:'past',courseId:'test',date:'2020-01-01',time:'13:00',minutes:780,price:50,players:4,holes:18,cart:false,source:'live',bookingUrl:course.bookingUrl };
-  assert.deepEqual(applySearch([row],new Map([[course.id,course]]),{...parseSearchQuery(params()),date:'2020-01-01'}),[]);
-});
-
-
 test('Chronogolf parser rejects blocked, member-only or vague rows before they become tee-time cards', () => {
-  const base = { start_time: '06:30', date: '2099-07-10', max_player_size: 4, default_price: { green_fee: 48, bookable_holes: 18 } };
-  const rows = parseTeetimesResponse(course, '2099-07-10', { status: 'open', teetimes: [
+  const base = { start_time: '06:30', date: date, max_player_size: 4, default_price: { green_fee: 48, bookable_holes: 18 } };
+  const rows = parseTeetimesResponse(course, date, { status: 'open', teetimes: [
     { ...base, frozen: true },
     { ...base, disabled: true },
     { ...base, available: false },
@@ -241,8 +310,8 @@ test('Chronogolf parser rejects blocked, member-only or vague rows before they b
 });
 
 test('Chronogolf parser can require the returned course uuid to match the searched course', () => {
-  const base = { start_time: '09:10', date: '2099-07-10', max_player_size: 4, course: { uuid: 'course-a', holes: 18 }, default_price: { green_fee: 88, bookable_holes: 18 } };
-  const rows = parseTeetimesResponse(course, '2099-07-10', { status: 'open', teetimes: [
+  const base = { start_time: '09:10', date: date, max_player_size: 4, course: { uuid: 'course-a', holes: 18 }, default_price: { green_fee: 88, bookable_holes: 18 } };
+  const rows = parseTeetimesResponse(course, date, { status: 'open', teetimes: [
     { ...base, course: { uuid: 'other-course', holes: 18 } },
     { ...base, course: undefined },
     base,
@@ -295,7 +364,7 @@ test('TeeTime pages require exact row-level date, price, capacity and holes', as
     { status: 200, headers: { 'content-type': 'text/html' } },
   )) as typeof fetch;
   try {
-    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, '2099-07-10');
+    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, date);
     assert.equal(rows?.length, 1);
     assert.equal(rows?.[0].id.includes('exact'), true);
     assert.equal(rows?.[0].price, 92);

@@ -1,53 +1,70 @@
-import { MARKET_IDS, MARKET_REGIONS, REGIONS, type MarketId, type Region, type SearchQuery } from "./types";
+import { addDaysISO, parseTimeToMinutes, todayISO } from "./format";
+import { MARKET_IDS, type MarketId } from "./types";
 
-const SORTS = ["price-desc", "price-asc", "closest-time", "closest-price", "distance"];
+export interface RangeQuery {
+  market: MarketId;
+  date: string;
+  /** Inclusive minute range since local midnight. */
+  startMin: number;
+  endMin: number;
+  part: number;
+  parts: number;
+}
 
-/** Validate requests before issuing any upstream provider calls. */
-export function parseSearchQuery(params: URLSearchParams): SearchQuery {
+/** The widest slice one request may ask a provider for. */
+export const MAX_RANGE_MINUTES = 6 * 60;
+
+/** Provider tee sheets rarely open more than a few weeks ahead. */
+export const MAX_DAYS_AHEAD = 60;
+export const MAX_PARTS = 8;
+
+export function isCalendarDate(date: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    !Number.isNaN(Date.parse(`${date}T12:00:00Z`)) &&
+    new Date(`${date}T12:00:00Z`).toISOString().slice(0, 10) === date;
+}
+
+export function isClockTime(time: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
+}
+
+/**
+ * Validate a provider range request before issuing any upstream calls. Only
+ * the fields that change what providers are asked for live here; everything
+ * else is filtered in the browser.
+ */
+export function parseRangeQuery(
+  params: URLSearchParams,
+  today = todayISO(),
+): RangeQuery {
   const date = params.get("date") ?? "";
-  const desiredTime = params.get("time") ?? "";
+  const start = params.get("start") ?? "";
+  const end = params.get("end") ?? "";
   const market = params.get("market") ?? "montreal";
   if (!MARKET_IDS.includes(market as MarketId)) {
     throw new Error("Choose a valid golf market.");
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-      Number.isNaN(Date.parse(`${date}T12:00:00Z`)) ||
-      new Date(`${date}T12:00:00Z`).toISOString().slice(0, 10) !== date)
-    throw new Error("Choose a valid calendar date.");
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(desiredTime))
-    throw new Error("Choose a valid time (HH:MM).");
-  const number = (key: string, min: number, max: number, integer = false) => {
+  if (!isCalendarDate(date)) throw new Error("Choose a valid calendar date.");
+  if (date < today) throw new Error("Choose today or a later date.");
+  if (date > addDaysISO(today, MAX_DAYS_AHEAD)) {
+    throw new Error(`Choose a date within ${MAX_DAYS_AHEAD} days.`);
+  }
+  if (!isClockTime(start) || !isClockTime(end)) throw new Error("Choose a valid time range (HH:MM).");
+  const startMin = parseTimeToMinutes(start);
+  const endMin = parseTimeToMinutes(end);
+  if (endMin < startMin || endMin - startMin > MAX_RANGE_MINUTES) {
+    throw new Error("Choose a time range of up to 6 hours.");
+  }
+  const integer = (key: string, min: number, max: number, fallback: number) => {
     const value = params.get(key);
-    if (value == null || value === "") return undefined;
+    if (value == null || value === "") return fallback;
     const n = Number(value);
-    if (!Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n)))
-      throw new Error(`Invalid ${key}: choose a value between ${min} and ${max}.`);
+    if (!Number.isInteger(n) || n < min || n > max) {
+      throw new Error(`Invalid ${key}: choose a whole number between ${min} and ${max}.`);
+    }
     return n;
   };
-  const holes = params.get("holes") ?? "any";
-  if (!["any", "9", "18"].includes(holes)) throw new Error("Choose 9 or 18 holes, or any.");
-  const sort = params.get("sort") ?? "price-asc";
-  if (!SORTS.includes(sort)) throw new Error("Choose a valid sort order.");
-  const regions = params.get("regions")?.split(",").filter(Boolean);
-  if (regions?.some((r) => !REGIONS.includes(r as Region))) throw new Error("Choose a valid golf region.");
-  if (regions?.some((r) => !MARKET_REGIONS[market as MarketId].includes(r as Region))) {
-    throw new Error("Choose a valid region for this market.");
-  }
-  const minPrice = number("min", 0, 1000);
-  const maxPrice = number("max", 0, 1000);
-  if (minPrice != null && maxPrice != null && minPrice > maxPrice)
-    throw new Error("Minimum price must be below the maximum price.");
-  return {
-    date, desiredTime, market: market as MarketId,
-    windowMinutes: number("window", 0, 180, true) ?? 60,
-    players: number("players", 1, 4, true) ?? 2,
-    holes: holes === "any" ? "any" : holes === "9" ? 9 : 18,
-    targetPrice: number("target", 0, 1000), minPrice, maxPrice,
-    maxDistanceKm: number("distance", 0, 500),
-    regions: regions as Region[] | undefined,
-    cartOnly: params.get("cart") === "1",
-    liveOnly: true,
-    publicOnly: params.get("public") === "1",
-    sort: sort as SearchQuery["sort"],
-  };
+  const parts = integer("parts", 1, MAX_PARTS, 1);
+  const part = integer("part", 0, parts - 1, 0);
+  return { market: market as MarketId, date, startMin, endMin, part, parts };
 }
