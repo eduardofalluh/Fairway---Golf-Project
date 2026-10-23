@@ -32,6 +32,8 @@ export async function GET(request: Request) {
       ? {
           "Cache-Control": "public, max-age=0, must-revalidate",
           "Netlify-CDN-Cache-Control": "public, durable, s-maxage=90, stale-while-revalidate=60",
+          // Netlify's CDN leaves query strings out of its cache key unless told.
+          "Netlify-Vary": "query=market|date|start|end|part|parts",
         }
       : { "Cache-Control": "no-store" };
     return NextResponse.json(result, { headers });

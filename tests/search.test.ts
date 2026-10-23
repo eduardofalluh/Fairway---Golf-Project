@@ -217,6 +217,9 @@ test('complete answers are CDN-cacheable; throttled ones never are', async () =>
     const ok = await GET(new Request(url, { headers: { 'x-forwarded-for': '10.0.0.1' } }));
     assert.equal(ok.status, 200);
     assert.match(ok.headers.get('Netlify-CDN-Cache-Control') ?? '', /s-maxage=90/);
+    // Netlify drops query strings from its cache key unless told, which would
+    // serve one day's or one market's tee times for another.
+    assert.equal(ok.headers.get('Netlify-Vary'), 'query=market|date|start|end|part|parts');
     assert.equal((await ok.json()).teeTimes.length, 1);
   } finally {
     fake.restore();
@@ -490,6 +493,19 @@ test('a failed or truncated course directory is reported, never treated as compl
     globalThis.fetch = fakeFetch;
     const again = await getChronogolfDirectory('montreal');
     assert.equal(again.state.status, 'ok', 'the partial list was not cached as complete');
+  } finally {
+    fake.restore();
+  }
+});
+
+test('/api/courses caches each market under its own CDN key', async () => {
+  const { GET: courses } = await import('../src/app/api/courses/route');
+  const fake = fakeChronogolf({});
+  try {
+    const res = await courses(new Request('http://localhost/api/courses?market=toronto'));
+    assert.equal((await res.json()).market, 'toronto');
+    assert.match(res.headers.get('Netlify-CDN-Cache-Control') ?? '', /durable/);
+    assert.equal(res.headers.get('Netlify-Vary'), 'query=market');
   } finally {
     fake.restore();
   }
