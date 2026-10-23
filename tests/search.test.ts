@@ -395,3 +395,16 @@ test('fallback links keep the date and round; the widget only exists for Chronog
   assert.equal(chronogolfWidgetUrl({ ...club, source: 'extra' }), null);
   assert.equal(chronogolfWidgetUrl({ ...club, chronogolfSlug: '../x?y' }), 'https://www.chronogolf.com/club/..%2Fx%3Fy/widget?medium=widget&source=club');
 });
+
+test('the results heading never claims zero tee times when providers did not answer', async () => {
+  const { resultsHeadline } = await import('../src/lib/results');
+  const base = { status: 'done' as const, error: null, windowTotal: 0, providers: {} };
+  assert.equal(resultsHeadline({ ...base, providers: { chronogolf: { status: 'ok' } } }), 'count');
+  assert.equal(resultsHeadline({ ...base, providers: { chronogolf: { status: 'unavailable', detail: 'http 403' } } }), 'blocked');
+  assert.equal(resultsHeadline({ ...base, providers: { chronogolf: { status: 'partial' } } }), 'blocked');
+  assert.equal(resultsHeadline({ ...base, providers: { chronogolf: { status: 'throttled', retryAfterSec: 30 } } }), 'paused');
+  assert.equal(resultsHeadline({ ...base, error: 'busy' }), 'paused');
+  assert.equal(resultsHeadline({ ...base, status: 'error', error: 'service' }), 'error');
+  assert.equal(resultsHeadline({ ...base, status: 'loading', providers: { chronogolf: { status: 'unavailable' } } }), 'count');
+  assert.equal(resultsHeadline({ ...base, windowTotal: 4, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'count');
+});

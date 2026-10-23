@@ -95,6 +95,12 @@ type Copy = {
     checkingCourse: string;
     foundSoFar: (count: number) => string;
     heading: (count: number) => string;
+    headlineBlocked: (provider: string) => string;
+    headlineBlockedSub: string;
+    headlinePaused: string;
+    headlinePausedSub: (provider: string) => string;
+    headlineError: string;
+    headlineErrorSub: string;
     acrossCourses: (courses: number) => string;
     windowSummary: (date: string, start: string, end: string) => string;
     views: { course: string; time: string; map: string };
@@ -290,6 +296,12 @@ export const copy: Record<Language, Copy> = {
       checkingCourse: "Now checking",
       foundSoFar: (n) => `${plural(n, "tee time", "tee times")} found so far`,
       heading: (n) => (n === 1 ? "tee time" : "tee times"),
+      headlineBlocked: (p) => `Live times are on ${p}`,
+      headlineBlockedSub: "We couldn't load them on this site right now. Tap “See live times” on any course below for its live tee sheet.",
+      headlinePaused: "Live times paused",
+      headlinePausedSub: (p) => `${p} asked us to wait a moment. We'll check again automatically.`,
+      headlineError: "Couldn't load tee times",
+      headlineErrorSub: "Check your connection and try again.",
       acrossCourses: (n) => `across ${plural(n, "course", "courses")}`,
       windowSummary: (date, start, end) => `${date} · ${start} – ${end}`,
       views: { course: "By course", time: "By time", map: "Map" },
@@ -502,6 +514,12 @@ export const copy: Record<Language, Copy> = {
       checkingCourse: "En cours",
       foundSoFar: (n) => `${plural(n, "départ trouvé", "départs trouvés")} jusqu’ici`,
       heading: (n) => (n === 1 ? "départ" : "départs"),
+      headlineBlocked: (p) => `Départs en direct sur ${p}`,
+      headlineBlockedSub: "Impossible de les charger sur ce site pour le moment. Touchez « Voir les départs » sur un parcours ci-dessous pour sa feuille en direct.",
+      headlinePaused: "Départs en pause",
+      headlinePausedSub: (p) => `${p} nous demande de patienter. Nouvelle vérification automatique sous peu.`,
+      headlineError: "Impossible de charger les départs",
+      headlineErrorSub: "Vérifiez votre connexion et réessayez.",
       acrossCourses: (n) => `dans ${plural(n, "parcours", "parcours")}`,
       windowSummary: (date, start, end) => `${date} · ${start} – ${end}`,
       views: { course: "Par parcours", time: "Par heure", map: "Carte" },

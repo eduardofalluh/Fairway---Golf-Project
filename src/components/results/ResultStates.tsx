@@ -18,7 +18,7 @@ import { Sheet } from "../ui/Sheet";
  * Honest notes when a provider throttled, partly answered, or is down. When the
  * provider says how long to wait, count it down and retry once on our own.
  */
-export function StatusBanners() {
+export function StatusBanners({ hideBlocked = false }: { hideBlocked?: boolean }) {
   const { search } = useSearch();
   const { t } = useLanguage();
   const notes: Array<{ key: string; text: string }> = [];
@@ -29,7 +29,8 @@ export function StatusBanners() {
       const name = t.results.providerName[id];
       if (state.status === "throttled") notes.push({ key: id, text: t.results.providerBusy(name, state.retryAfterSec) });
       else if (state.status === "partial") notes.push({ key: id, text: t.results.providerPartial(name) });
-      else if (state.status === "unavailable") notes.push({ key: id, text: t.results.providerDown(name) });
+      // The heading already explains a blocked provider; don't repeat it.
+      else if (state.status === "unavailable" && !hideBlocked) notes.push({ key: id, text: t.results.providerDown(name) });
       if (state.status === "throttled" || state.status === "partial") waitSec = Math.max(waitSec, state.retryAfterSec ?? 0);
     }
   }

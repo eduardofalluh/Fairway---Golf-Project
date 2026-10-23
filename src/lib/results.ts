@@ -150,3 +150,25 @@ export function mergeProviderStates(states: ProviderState[]): ProviderState | nu
   if (anyAnswered || okCount > 0) return { status: "partial", retryAfterSec, ...(detail ? { detail } : {}) };
   return { status: worst.status, retryAfterSec, ...(detail ? { detail } : {}) };
 }
+
+export type Headline = "count" | "blocked" | "paused" | "error";
+
+/**
+ * What the results heading may honestly claim. "0 tee times" is only shown
+ * when the providers actually answered; if they blocked us, asked us to wait,
+ * or Fairway itself failed, the heading says that instead of a zero.
+ */
+export function resultsHeadline(input: {
+  status: "idle" | "loading" | "done" | "error";
+  error: "service" | "busy" | null;
+  windowTotal: number;
+  providers: Partial<Record<string, ProviderState>>;
+}): Headline {
+  if (input.windowTotal > 0) return "count";
+  if (input.status === "error") return "error";
+  if (input.status !== "done") return "count";
+  const states = Object.values(input.providers).filter((s): s is ProviderState => Boolean(s));
+  if (input.error === "busy" || states.some((s) => s.status === "throttled")) return "paused";
+  if (states.some((s) => s.status === "unavailable" || s.status === "partial")) return "blocked";
+  return "count";
+}

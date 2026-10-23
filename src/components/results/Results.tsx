@@ -17,6 +17,8 @@ import { driveMinutes, haversineKm } from "@/lib/geo";
 import { formatLongDateForLanguage, formatTimeForLanguage, useLanguage } from "@/lib/i18n";
 import { selectMapTeeTimes } from "@/lib/map-results";
 import { activeFilterCount } from "@/lib/search-state";
+import { resultsHeadline } from "@/lib/results";
+import type { ProviderId } from "@/lib/types";
 import { SORT_KEYS, type SortKey } from "@/lib/types";
 
 function MapLoading() {
@@ -209,25 +211,53 @@ export function Results() {
   }
 
   const dateLabel = query.date ? formatLongDateForLanguage(query.date, lang) : "";
+  const windowLabel = dateLabel
+    ? t.results.windowSummary(dateLabel, formatTimeForLanguage(minutesToHHMM(win.startMin), lang), formatTimeForLanguage(minutesToHHMM(win.endMin), lang))
+    : "";
+  const headline = resultsHeadline({ status: search.status, error: search.error, windowTotal, providers: search.providers });
+  const troubled = (Object.keys(search.providers) as ProviderId[]).find((id) => search.providers[id]?.status !== "ok");
+  const providerName = t.results.providerName[troubled ?? "chronogolf"];
+  const headlineTitle =
+    headline === "blocked" ? t.results.headlineBlocked(providerName)
+      : headline === "paused" ? t.results.headlinePaused
+        : headline === "error" ? t.results.headlineError
+          : null;
+  const headlineSub =
+    headline === "blocked" ? t.results.headlineBlockedSub
+      : headline === "paused" ? t.results.headlinePausedSub(providerName)
+        : headline === "error" ? t.results.headlineErrorSub
+          : null;
 
   return (
     <section id="results" aria-labelledby="results-title" className="relative mx-auto max-w-[1440px] px-4 py-14 sm:px-8 sm:py-20 lg:px-10">
       <p className="sr-only" aria-live="polite">
-        {search.status === "done" ? t.results.announce(results.length, groups.length) : ""}
+        {search.status === "done" ? headlineTitle ?? t.results.announce(results.length, groups.length) : ""}
       </p>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.22em] text-fog">
             <span className="live-dot" aria-hidden /> {t.results.eyebrow}
           </p>
-          <h2 id="results-title" className="mt-3 flex flex-wrap items-baseline gap-x-3 font-display font-semibold leading-[0.95] tracking-[-.04em] text-cream">
-            <AnimatedNumber value={results.length} className="text-6xl tabular-nums sm:text-7xl" />
-            <span className="text-3xl text-cream/70 sm:text-4xl">{t.results.heading(results.length)}</span>
-          </h2>
-          <p className="mt-2 text-sm text-fog sm:text-[1rem]">
-            {t.results.acrossCourses(groups.length)}
-            {dateLabel && ` · ${t.results.windowSummary(dateLabel, formatTimeForLanguage(minutesToHHMM(win.startMin), lang), formatTimeForLanguage(minutesToHHMM(win.endMin), lang))}`}
-          </p>
+          {headlineTitle ? (
+            <motion.div key={headline} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <h2 id="results-title" className="mt-3 font-display text-4xl font-semibold leading-[0.95] tracking-[-.035em] text-cream sm:text-6xl">
+                {headlineTitle}
+              </h2>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-fog sm:text-[1rem]">{headlineSub}</p>
+              {windowLabel && <p className="mt-1 text-xs text-fog">{windowLabel}</p>}
+            </motion.div>
+          ) : (
+            <>
+              <h2 id="results-title" className="mt-3 flex flex-wrap items-baseline gap-x-3 font-display font-semibold leading-[0.95] tracking-[-.04em] text-cream">
+                <AnimatedNumber value={results.length} className="text-6xl tabular-nums sm:text-7xl" />
+                <span className="text-3xl text-cream/70 sm:text-4xl">{t.results.heading(results.length)}</span>
+              </h2>
+              <p className="mt-2 text-sm text-fog sm:text-[1rem]">
+                {t.results.acrossCourses(groups.length)}
+                {windowLabel && ` · ${windowLabel}`}
+              </p>
+            </>
+          )}
         </div>
         <Toolbar />
       </div>
@@ -257,7 +287,7 @@ export function Results() {
         <p className="mt-2 text-xs font-semibold text-fog">{t.results.foundSoFar(results.length)}</p>
       )}
 
-      <StatusBanners />
+      <StatusBanners hideBlocked={headline === "blocked"} />
       {(results.length > 0 || filters.slice) && view !== "map" && <TimelineRail />}
       {body}
     </section>
