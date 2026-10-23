@@ -121,7 +121,7 @@ function Toolbar() {
 }
 
 export function Results() {
-  const { ready, query, filters, search, results, windowTotal, groups, view, userLoc, openBooking, geo, window: win } = useSearch();
+  const { ready, query, filters, search, results, groups, view, userLoc, openBooking, geo, window: win } = useSearch();
   const { t, lang } = useLanguage();
   const [limit, setLimit] = useState(GROUP_PAGE);
   const [limitKey, setLimitKey] = useState(search.key);
@@ -163,7 +163,9 @@ export function Results() {
   if (loading && results.length === 0) body = <LoadingPanel />;
   else if (search.status === "error") body = <ServiceError />;
   else if (results.length === 0) {
-    body = windowTotal === 0 && providerTrouble ? <HandoffList /> : <EmptyState />;
+    // "Nothing open" is only true when every provider answered; otherwise point
+    // golfers at each course's live sheet.
+    body = providerTrouble ? <HandoffList /> : <EmptyState />;
   } else if (view === "map") {
     body = (
       <div className="mt-6">
@@ -214,7 +216,7 @@ export function Results() {
   const windowLabel = dateLabel
     ? t.results.windowSummary(dateLabel, formatTimeForLanguage(minutesToHHMM(win.startMin), lang), formatTimeForLanguage(minutesToHHMM(win.endMin), lang))
     : "";
-  const headline = resultsHeadline({ status: search.status, error: search.error, windowTotal, providers: search.providers });
+  const headline = resultsHeadline({ status: search.status, error: search.error, visible: results.length, providers: search.providers });
   const troubled = (Object.keys(search.providers) as ProviderId[]).find((id) => search.providers[id]?.status !== "ok");
   const providerName = t.results.providerName[troubled ?? "chronogolf"];
   const headlineTitle =

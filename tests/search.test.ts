@@ -398,7 +398,7 @@ test('fallback links keep the date and round; the widget only exists for Chronog
 
 test('the results heading never claims zero tee times when providers did not answer', async () => {
   const { resultsHeadline } = await import('../src/lib/results');
-  const base = { status: 'done' as const, error: null, windowTotal: 0, providers: {} };
+  const base = { status: 'done' as const, error: null, visible: 0, providers: {} };
   assert.equal(resultsHeadline({ ...base, providers: { chronogolf: { status: 'ok' } } }), 'count');
   assert.equal(resultsHeadline({ ...base, providers: { chronogolf: { status: 'unavailable', detail: 'http 403' } } }), 'blocked');
   assert.equal(resultsHeadline({ ...base, providers: { chronogolf: { status: 'partial' } } }), 'blocked');
@@ -406,5 +406,7 @@ test('the results heading never claims zero tee times when providers did not ans
   assert.equal(resultsHeadline({ ...base, error: 'busy' }), 'paused');
   assert.equal(resultsHeadline({ ...base, status: 'error', error: 'service' }), 'error');
   assert.equal(resultsHeadline({ ...base, status: 'loading', providers: { chronogolf: { status: 'unavailable' } } }), 'count');
-  assert.equal(resultsHeadline({ ...base, windowTotal: 4, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'count');
+  assert.equal(resultsHeadline({ ...base, visible: 4, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'count');
+  // Rows that exist but can't be shown (stale or filtered) never turn a blocked search into "0 tee times".
+  assert.equal(resultsHeadline({ ...base, visible: 0, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'blocked');
 });
