@@ -1,9 +1,10 @@
 import { EXTRA_COURSES } from "./courses";
-import { fetchChronogolfWindow, getChronogolfDirectory } from "./providers/chronogolf";
+import { getChronogolfDirectory } from "./providers/chronogolf";
+import { LIVE_FEEDS, LIVE_PROVIDER_IDS } from "./providers/live-feeds";
 import { mergeProviderStates } from "./results";
-import { fetchTeeTimeWindow } from "./providers/teetime";
 import { parseTimeToMinutes } from "./format";
 import { deepBookingUrl } from "./booking-links";
+import { hasLiveFeed } from "./live-feed";
 
 export { deepBookingUrl };
 import type { RangeQuery } from "./search-query";
@@ -26,9 +27,10 @@ const norm = (s: string) =>
     .replace(/[^a-z0-9]/g, "");
 
 /**
- * The full course directory: live Chronogolf courses + curated non-Chronogolf
- * extras (extras dropped if a live course already covers the same name), and
- * whether the Chronogolf part was read completely.
+ * The course directory golfers can actually book: live Chronogolf courses plus
+ * curated courses on other systems (other live feeds, booking links, phone),
+ * and whether the Chronogolf part was read completely. Private clubs and
+ * Chronogolf listings with no known way to book are left out.
  */
 export async function getDirectoryWithState(
   market: MarketId = "montreal",
@@ -38,23 +40,27 @@ export async function getDirectoryWithState(
   const marketExtras = EXTRA_COURSES.filter((course) => course.market === market);
   const curatedByName = new Map(marketExtras.map((c) => [norm(c.name), c]));
   const usedCurated = new Set<string>();
-  const directory = live.map((course) => {
-    const curated = curatedByName.get(norm(course.name));
-    if (curated?.source === "teetime") {
-      usedCurated.add(norm(course.name));
-      return curated;
+  const directory: GolfCourse[] = [];
+  for (const course of live) {
+    const key = norm(course.name);
+    const curated = curatedByName.get(key);
+    // A curated live feed wins; a directory-only Chronogolf listing must not
+    // hide a verified booking page or phone line.
+    const replace = curated && (curated.source !== "extra" || !course.online);
+    if (!replace) {
+      directory.push(course);
+      continue;
     }
-    // Directory-only Chronogolf entries must not hide a verified booking portal.
-    if (!course.online && curated) return {
-      ...curated, id: course.id, photo: course.photo ?? curated.photo,
-    };
-    return course;
-  });
-  const extras = marketExtras.filter(
-    (e) => !liveNames.has(norm(e.name)) && !usedCurated.has(norm(e.name)),
-  );
+    // Chronogolf sometimes lists one club twice; it becomes one course.
+    if (usedCurated.has(key)) continue;
+    usedCurated.add(key);
+    directory.push(curated.source === "extra" ? { ...curated, id: course.id, photo: course.photo ?? curated.photo } : curated);
+  }
+  const extras = marketExtras.filter((e) => !liveNames.has(norm(e.name)));
   return {
-    courses: [...directory, ...extras].sort((a, b) => a.distanceKm - b.distanceKm),
+    courses: [...directory, ...extras]
+      .filter((c) => c.access !== "private")
+      .sort((a, b) => a.distanceKm - b.distanceKm),
     chronogolf: state,
   };
 }
@@ -71,7 +77,7 @@ export async function findCourse(market: MarketId, courseId: string): Promise<Go
 /** Courses with a live feed Fairway can read, in a stable order. */
 function liveFeedCourses(directory: GolfCourse[]): GolfCourse[] {
   return directory
-    .filter((c) => c.online && (c.chronogolfSlug || c.teeTimeSlug))
+    .filter(hasLiveFeed)
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -99,29 +105,30 @@ export async function searchPart(query: RangeQuery): Promise<TeeTimePartResponse
   const { startMin, endMin } = query;
   const byId = new Map(courses.map((c) => [c.id, c]));
 
-  const [chronogolf, teetime] = await Promise.all([
-    fetchChronogolfWindow(courses.filter((c) => c.source === "chronogolf"), query.date, startMin, endMin),
-    fetchTeeTimeWindow(courses.filter((c) => c.source === "teetime"), query.date, startMin, endMin),
-  ]);
+  const answers = await Promise.all(
+    LIVE_PROVIDER_IDS.map(async (id) => {
+      const mine = courses.filter((c) => c.source === id);
+      return { id, asked: mine.length, answer: await LIVE_FEEDS[id](mine, query.date, startMin, endMin) };
+    }),
+  );
 
   const providers: Partial<Record<ProviderId, ProviderState>> = {};
+  const teeTimes: TeeTime[] = [];
+  for (const { id, asked, answer } of answers) {
+    if (asked > 0) providers[id] = answer.state;
+    for (const row of answer.rows) {
+      const course = byId.get(row.courseId);
+      if (!course || row.date !== query.date) continue;
+      if (row.minutes < startMin || row.minutes > endMin) continue;
+      teeTimes.push({ ...row, bookingUrl: deepBookingUrl(course, row.date, row.holes) });
+    }
+  }
   // If the directory itself wasn't fully read, this part can't be complete —
   // even when it has no Chronogolf courses left to ask about.
-  if (courses.some((c) => c.source === "chronogolf")) {
-    providers.chronogolf = directoryState.status === "ok"
-      ? chronogolf.state
-      : mergeProviderStates([directoryState, chronogolf.state]) ?? directoryState;
-  } else if (directoryState.status !== "ok") {
-    providers.chronogolf = directoryState;
-  }
-  if (courses.some((c) => c.source === "teetime")) providers.teetime = teetime.state;
-
-  const teeTimes: TeeTime[] = [];
-  for (const row of [...chronogolf.rows, ...teetime.rows]) {
-    const course = byId.get(row.courseId);
-    if (!course || row.date !== query.date) continue;
-    if (row.minutes < startMin || row.minutes > endMin) continue;
-    teeTimes.push({ ...row, bookingUrl: deepBookingUrl(course, row.date, row.holes) });
+  if (directoryState.status !== "ok") {
+    providers.chronogolf = providers.chronogolf
+      ? mergeProviderStates([directoryState, providers.chronogolf]) ?? directoryState
+      : directoryState;
   }
   teeTimes.sort((a, b) => a.minutes - b.minutes || a.price - b.price);
 

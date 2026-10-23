@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowUpRight, CalendarPlus, Flag, MoveHorizontal, RotateCw, Timer, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarPlus, Flag, MoveHorizontal, Phone, RotateCw, Timer, X } from "lucide-react";
 import { addDaysISO } from "@/lib/format";
 import { chronogolfWidgetUrl, deepBookingUrl } from "@/lib/booking-links";
-import { distanceFor } from "@/lib/results";
+import { coursesToCheck, distanceFor } from "@/lib/results";
 import { activeFilterCount } from "@/lib/search-state";
 import { getBookingProvider, safeBookingUrl } from "@/lib/providers/config";
 import { useLanguage } from "@/lib/i18n";
@@ -167,30 +167,40 @@ function LiveTimesSheet({ course, onClose }: { course: GolfCourse | null; onClos
 
 const HANDOFF_PAGE = 12;
 
+/** `tel:` link for a North American number written like "514 488-6612". */
+function telHref(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 ? `tel:+1${digits}` : null;
+}
+
 /**
- * When live sheets can't be read from our server, every course still gets a
- * way to see its times: Chronogolf's own widget (loaded in the golfer's
- * browser), or the booking page with the date and round already set.
+ * Every course whose times aren't in the results still gets a way to see them:
+ * Chronogolf's own widget (loaded in the golfer's browser), a call to the pro
+ * shop, or the booking page with the date and round already set. `fallback` is
+ * the whole answer when providers didn't respond; `more` follows live results.
  */
-export function HandoffList() {
-  const { directory, userLoc, query, filters } = useSearch();
+export function HandoffList({ mode }: { mode: "fallback" | "more" }) {
+  const { directory, userLoc, query, filters, search, results } = useSearch();
   const { t } = useLanguage();
   const [limit, setLimit] = useState(HANDOFF_PAGE);
   const [liveCourse, setLiveCourse] = useState<GolfCourse | null>(null);
   const holes = filters.holes === 9 ? 9 : 18;
-  const courses = directory
-    .filter((c) => safeBookingUrl(c.bookingUrl) && c.access !== "private")
-    .sort((a, b) => distanceFor(a, userLoc) - distanceFor(b, userLoc));
+  const shown = new Set(results.map((r) => r.course.id));
+  const courses = coursesToCheck(directory, search.providers, shown, filters, userLoc);
   if (courses.length === 0) return null;
   return (
-    <div className="mt-8">
-      <h3 className="font-display text-3xl font-semibold text-cream">{t.results.handoffTitle(courses.length)}</h3>
-      <p className="mt-1 max-w-2xl text-sm text-fog">{t.results.handoffBody}</p>
+    <div className={mode === "more" ? "mt-14" : "mt-8"}>
+      <h3 className="font-display text-3xl font-semibold text-cream">
+        {mode === "more" ? t.results.moreTitle(courses.length) : t.results.handoffTitle(courses.length)}
+      </h3>
+      <p className="mt-1 max-w-2xl text-sm text-fog">{mode === "more" ? t.results.moreBody : t.results.handoffBody}</p>
       <ul className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
         {courses.slice(0, limit).map((course, i) => {
           const provider = getBookingProvider(course.bookingUrl);
           const href = safeBookingUrl(query.date ? deepBookingUrl(course, query.date, holes) : course.bookingUrl);
           const widget = chronogolfWidgetUrl(course);
+          const tel = course.phone ? telHref(course.phone) : null;
+          const primary = widget ? "widget" : tel ? "tel" : "link";
           return (
             <motion.li
               key={course.id}
@@ -206,7 +216,7 @@ export function HandoffList() {
                 <p className="truncate font-semibold text-cream">{course.name}</p>
                 <p className="truncate text-xs text-fog">{course.city} · {Math.round(distanceFor(course, userLoc))} km</p>
                 <span className="mt-1 inline-block rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-fog">
-                  {t.results.handoffBadge}
+                  {tel ? t.results.phoneBadge : t.results.handoffBadge}
                 </span>
               </div>
               <div className="flex w-full flex-col gap-2 min-[400px]:flex-row sm:w-auto">
@@ -219,16 +229,24 @@ export function HandoffList() {
                     <Timer aria-hidden size={15} /> {t.results.seeLiveTimes}
                   </button>
                 )}
+                {tel && course.phone && (
+                  <a
+                    href={tel}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-forest px-4 text-sm font-semibold text-white transition hover:bg-forest-soft sm:flex-none"
+                  >
+                    <Phone aria-hidden size={15} /> {t.results.callCourse(course.phone)}
+                  </a>
+                )}
                 {href && (
                   <a
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition sm:flex-none ${
-                      widget ? "border border-forest/30 text-forest hover:bg-lime/20" : "bg-forest text-white hover:bg-forest-soft"
+                      primary === "link" ? "bg-forest text-white hover:bg-forest-soft" : "border border-forest/30 text-forest hover:bg-lime/20"
                     }`}
                   >
-                    {t.results.openProvider(provider.id === "course" ? "" : provider.name).trim()} <ArrowUpRight aria-hidden size={15} />
+                    {provider.id === "course" ? t.results.openSite : t.results.openProvider(provider.name)} <ArrowUpRight aria-hidden size={15} />
                   </a>
                 )}
               </div>

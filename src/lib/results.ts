@@ -1,7 +1,10 @@
 import { haversineKm } from "./geo";
 import { parseTimeToMinutes } from "./format";
+import { hasLiveFeed } from "./live-feed";
+import { safeBookingUrl } from "./providers/config";
 import type {
   GolfCourse,
+  ProviderId,
   ProviderState,
   ProviderStatus,
   SearchFilters,
@@ -26,6 +29,28 @@ export interface FilterContext {
 
 export function distanceFor(course: GolfCourse, userLoc?: { lat: number; lng: number } | null) {
   return userLoc ? haversineKm(userLoc.lat, userLoc.lng, course.lat, course.lng) : course.distanceKm;
+}
+
+/**
+ * Courses a golfer should still look at after a search: ones Fairway has no
+ * live feed for, and ones whose provider didn't fully answer and so show no
+ * times. Same region, distance and access filters as the results; nearest first.
+ */
+export function coursesToCheck(
+  directory: GolfCourse[],
+  providers: Partial<Record<ProviderId, ProviderState>>,
+  shownCourseIds: ReadonlySet<string>,
+  filters: Pick<SearchFilters, "regions" | "maxDistanceKm" | "publicOnly">,
+  userLoc?: { lat: number; lng: number } | null,
+): GolfCourse[] {
+  const troubled = new Set(Object.entries(providers).filter(([, state]) => state && state.status !== "ok").map(([id]) => id));
+  return directory
+    .filter((c) => c.access !== "private" && (safeBookingUrl(c.bookingUrl) || c.phone))
+    .filter((c) => !hasLiveFeed(c) || (troubled.has(c.source) && !shownCourseIds.has(c.id)))
+    .filter((c) => !filters.publicOnly || c.access === "public")
+    .filter((c) => !filters.regions.length || filters.regions.includes(c.region))
+    .filter((c) => typeof filters.maxDistanceKm !== "number" || distanceFor(c, userLoc) <= filters.maxDistanceKm)
+    .sort((a, b) => distanceFor(a, userLoc) - distanceFor(b, userLoc));
 }
 
 export function filterTeeTimes(

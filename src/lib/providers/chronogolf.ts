@@ -179,12 +179,22 @@ function radiusForMarket(market: MarketId) {
   return Number(process.env[envKey] ?? process.env.CHRONOGOLF_RADIUS_KM ?? getMarket(market).defaultRadiusKm);
 }
 
+/** Indoor simulators and closed courses that Chronogolf still lists. */
+const NOT_COURSES = new Set([
+  "golf-interieur-le-birdie",
+  "mulligan-s-golf-experience",
+  "le-myo-club",
+  "golf-candiac", // closed in 2019
+]);
+
 function toCourse(market: MarketId, c: SearchCourse): GolfCourse | null {
   if (!c.uuid || !c.location) return null;
   // The radius crosses the US border; advertised fees here are CAD only.
   if (c.country !== "Canada") return null;
-  // Chronogolf's own demo/office listings ("Club Chronogolf") aren't courses.
-  if (/\b(demo|test|sandbox)\b|lightspeed pas|^club chronogolf$/i.test(c.name.trim())) return null;
+  // Chronogolf's own demo/office listings ("Club Chronogolf") and retired
+  // entries ("… DO NOT USE") aren't courses.
+  if (/\b(demo|test|sandbox|do not use)\b|lightspeed pas|^club chronogolf$/i.test(c.name.trim())) return null;
+  if (NOT_COURSES.has(c.slug)) return null;
   const { lat, lon } = c.location;
   const city = c.city ?? "";
   const holes = (c.holes && c.holes.length ? [...new Set(c.holes)] : [18]).filter(

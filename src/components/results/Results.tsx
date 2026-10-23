@@ -165,7 +165,7 @@ export function Results() {
   else if (results.length === 0) {
     // "Nothing open" is only true when every provider answered; otherwise point
     // golfers at each course's live sheet.
-    body = providerTrouble ? <HandoffList /> : <EmptyState />;
+    body = providerTrouble ? <HandoffList mode="fallback" /> : <EmptyState />;
   } else if (view === "map") {
     body = (
       <div className="mt-6">
@@ -292,6 +292,8 @@ export function Results() {
       <StatusBanners hideBlocked={headline === "blocked"} />
       {(results.length > 0 || filters.slice) && view !== "map" && <TimelineRail />}
       {body}
+      {/* Courses Fairway can't read live still belong in a one-stop search. */}
+      {search.status === "done" && (results.length > 0 || !providerTrouble) && <HandoffList mode="more" />}
     </section>
   );
 }

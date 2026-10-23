@@ -1,4 +1,5 @@
 import type { GolfCourse, ProviderState, TeeTime } from "../types";
+import { feedStatus } from "../live-feed";
 
 const BASE = "https://tee-time.com";
 const UA =
@@ -154,16 +155,16 @@ export async function fetchTeeTimeWindow(
   date: string,
   startMin: number,
   endMin: number,
+  options: { fresh?: boolean } = {},
 ): Promise<{ rows: TeeTime[]; state: ProviderState }> {
   const clubs = courses.filter((c) => c.online && c.teeTimeSlug);
   if (clubs.length === 0) return { rows: [], state: { status: "ok" } };
-  const sheets = await Promise.all(clubs.map((course) => fetchCourseSheet(course, date, false)));
+  const sheets = await Promise.all(clubs.map((course) => fetchCourseSheet(course, date, Boolean(options.fresh))));
   const rows = sheets
     .flatMap((sheet) => sheet.rows ?? [])
     .filter((row) => row.minutes >= startMin && row.minutes <= endMin);
   const answered = sheets.filter((sheet) => sheet.rows).length;
   const throttled = sheets.some((sheet) => sheet.throttled);
-  const status: ProviderState["status"] =
-    answered === clubs.length ? "ok" : answered > 0 ? "partial" : throttled ? "throttled" : "unavailable";
+  const status = feedStatus(answered, clubs.length, throttled);
   return { rows, state: throttled ? { status, retryAfterSec: 30 } : { status } };
 }

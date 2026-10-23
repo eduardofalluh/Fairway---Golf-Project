@@ -1,6 +1,6 @@
 import { deepBookingUrl, findCourse } from "./aggregator";
-import { fetchChronogolfWindow } from "./providers/chronogolf";
-import { fetchTeeTimeCourseTeeTimes } from "./providers/teetime";
+import { LIVE_FEEDS } from "./providers/live-feeds";
+import { hasLiveFeed } from "./live-feed";
 import { parseTimeToMinutes } from "./format";
 import { isCalendarDate, isClockTime, MAX_DAYS_AHEAD } from "./search-query";
 import { addDaysISO, todayISO } from "./format";
@@ -63,19 +63,14 @@ function sameCents(a: number, b: number) {
  */
 export async function verifyLiveTeeTime(slot: SlotRequest): Promise<LiveVerificationResult> {
   const course = await findCourse(slot.market, slot.courseId);
-  if (!course || !course.online || !(course.chronogolfSlug || course.teeTimeSlug)) {
+  if (!course || !hasLiveFeed(course)) {
     return { ok: false, reason: "not_found", note: "Fairway can only continue with provider-confirmed live tee times." };
   }
   const bookingUrl = deepBookingUrl(course, slot.date, slot.holes);
   const minutes = parseTimeToMinutes(slot.time);
 
-  let rows: TeeTime[] | null = null;
-  if (course.source === "chronogolf") {
-    const sheet = await fetchChronogolfWindow([course], slot.date, minutes, minutes, { fresh: true });
-    rows = sheet.state.status === "ok" ? sheet.rows : null;
-  } else if (course.source === "teetime") {
-    rows = await fetchTeeTimeCourseTeeTimes(course, slot.date, { fresh: true });
-  }
+  const sheet = await LIVE_FEEDS[course.source]([course], slot.date, minutes, minutes, { fresh: true });
+  const rows: TeeTime[] | null = sheet.state.status === "ok" ? sheet.rows : null;
 
   if (!rows) {
     return {

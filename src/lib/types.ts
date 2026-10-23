@@ -66,13 +66,19 @@ export interface GolfCourse {
   distanceKm: number;
   lat: number;
   lng: number;
-  /** Where this course's data comes from. */
-  source: "chronogolf" | "teetime" | "extra";
+  /** Where this course's data comes from: a live feed, or a curated listing. */
+  source: ProviderId | "extra";
   /** Chronogolf identifiers (present when source === "chronogolf"). */
   chronogolfUuid?: string;
   chronogolfSlug?: string;
   /** TeeTime slug (present when source === "teetime"). */
   teeTimeSlug?: string;
+  /** Jonas ClubHouse Online host and course id (present when source === "jonas"). */
+  jonas?: { host: string; courseId: number };
+  /** TeeItUp booking alias, the `<alias>.book.teeitup.golf` subdomain (source === "teeitup"). */
+  teeItUpAlias?: string;
+  /** Public phone for courses that only take tee-time bookings by phone. */
+  phone?: string;
   /** Real base prices from Chronogolf when available (CAD per player). */
   weekdayPrice?: number | null;
   weekendPrice?: number | null;
@@ -153,7 +159,8 @@ export interface SearchFilters {
   slice?: [number, number];
 }
 
-export type ProviderId = "chronogolf" | "teetime";
+/** Booking systems Fairway reads live tee sheets from. */
+export type ProviderId = "chronogolf" | "teetime" | "jonas" | "teeitup";
 
 /**
  * ok = every sheet answered; partial = some sheets answered; throttled = the

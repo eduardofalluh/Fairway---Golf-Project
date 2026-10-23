@@ -142,7 +142,12 @@ type Copy = {
     handoffTitle: (count: number) => string;
     handoffBody: string;
     handoffBadge: string;
+    moreTitle: (count: number) => string;
+    moreBody: string;
+    phoneBadge: string;
+    callCourse: (phone: string) => string;
     openProvider: (name: string) => string;
+    openSite: string;
     seeLiveTimes: string;
     widgetTitle: (course: string) => string;
     widgetNote: string;
@@ -339,17 +344,22 @@ export const copy: Record<Language, Copy> = {
       tryWider: "Widen to ± 2 hr",
       tryTomorrow: "Try the next day",
       clearFilters: "Clear filters",
-      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime" },
+      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime", jonas: "Jonas", teeitup: "TeeItUp" },
       providerBusy: (p, s) => `${p} asked us to slow down${s ? ` — try again in about ${s}s` : ""}. Showing everything we could check.`,
       providerPartial: (p) => `Some ${p} courses didn't answer in time, so a few tee times may be missing.`,
-      providerDown: (p) => `${p} isn't sharing live times with this site right now. Each course below shows its live ${p} tee sheet.`,
+      providerDown: (p) => `${p} isn't sharing live times with this site right now. Its courses are listed below with their own booking pages.`,
       retry: "Retry",
       serviceError: "We couldn't reach the tee-time service. Check your connection and try again.",
       busyError: "You're searching faster than the tee sheets can keep up. Give it a few seconds.",
       handoffTitle: (n) => `${plural(n, "course", "courses")} you can book directly`,
       handoffBody: "Tap “See live times” for the course's live sheet right here, or open its booking page with your date already set.",
       handoffBadge: "Book on site",
+      moreTitle: (n) => `${plural(n, "more course", "more courses")} to check`,
+      moreBody: "Fairway can't read these tee sheets right now. Open each one with your date already set, or call.",
+      phoneBadge: "Book by phone",
+      callCourse: (phone) => `Call ${phone}`,
       openProvider: (name) => `Open ${name}`,
+      openSite: "Open website",
       seeLiveTimes: "See live times",
       widgetTitle: (course) => `${course} · live tee times`,
       widgetNote: "This is Chronogolf's own booking widget. Pick your date and time, then book with Chronogolf.",
@@ -557,17 +567,22 @@ export const copy: Record<Language, Copy> = {
       tryWider: "Élargir à ± 2 h",
       tryTomorrow: "Essayer le lendemain",
       clearFilters: "Effacer les filtres",
-      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime" },
+      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime", jonas: "Jonas", teeitup: "TeeItUp" },
       providerBusy: (p, s) => `${p} nous demande de ralentir${s ? ` — réessayez dans environ ${s} s` : ""}. Voici tout ce qu’on a pu vérifier.`,
       providerPartial: (p) => `Certains parcours ${p} n’ont pas répondu à temps; quelques départs peuvent manquer.`,
-      providerDown: (p) => `${p} ne partage pas ses départs en direct avec ce site pour le moment. Chaque parcours ci-dessous affiche sa feuille ${p} en direct.`,
+      providerDown: (p) => `${p} ne partage pas ses départs en direct avec ce site pour le moment. Ses parcours sont listés plus bas avec leur propre page de réservation.`,
       retry: "Réessayer",
       serviceError: "Impossible de joindre le service de départs. Vérifiez votre connexion et réessayez.",
       busyError: "Vous cherchez plus vite que les feuilles de départ peuvent suivre. Patientez quelques secondes.",
       handoffTitle: (n) => `${plural(n, "parcours", "parcours")} à réserver directement`,
       handoffBody: "Touchez « Voir les départs » pour la feuille en direct du parcours ici même, ou ouvrez sa page de réservation avec votre date déjà choisie.",
       handoffBadge: "Réserver sur le site",
+      moreTitle: (n) => `${plural(n, "autre parcours", "autres parcours")} à vérifier`,
+      moreBody: "Fairway ne peut pas lire ces feuilles de départ pour l’instant. Ouvrez chacune avec votre date déjà choisie, ou appelez.",
+      phoneBadge: "Réservation par téléphone",
+      callCourse: (phone) => `Appeler le ${phone}`,
       openProvider: (name) => `Ouvrir ${name}`,
+      openSite: "Ouvrir le site",
       seeLiveTimes: "Voir les départs",
       widgetTitle: (course) => `${course} · départs en direct`,
       widgetNote: "Voici le widget de réservation de Chronogolf. Choisissez la date et l’heure, puis réservez avec Chronogolf.",
