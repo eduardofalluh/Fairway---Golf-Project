@@ -47,6 +47,7 @@ Chronogolf returns 429 with `Retry-After: 60` after roughly two dozen requests a
 - Ask only for the searched minutes (`start_time`/`end_time`), batch up to 40 course ids per request, and stop paging on a short page.
 - Never add searches on page load beyond the default, refetch on sort/filter, or poll. Sorting and filtering happen in the browser.
 - Keep the 90 s data/CDN cache for complete answers only; never cache throttled or failed ones.
+- Netlify's CDN leaves query strings out of its cache key: every CDN-cached response must send `Netlify-Vary: query=<each param that changes the answer>`, or one market or day is served for another.
 - Any change to search must state its upstream call count; prove it with `fakeChronogolf(...).sheetCalls()` in a test.
 
 ## Code standards
