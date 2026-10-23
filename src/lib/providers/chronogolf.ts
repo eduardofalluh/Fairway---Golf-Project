@@ -215,47 +215,75 @@ function toCourse(market: MarketId, c: SearchCourse): GolfCourse | null {
 }
 
 const directoryCache = new Map<MarketId, { at: number; courses: GolfCourse[] }>();
+const MAX_DIRECTORY_PAGES = 10;
 
 /**
- * Pull the live Chronogolf course directory around a market. Cached in-process
- * and in Next's data cache for 6h. Returns [] if Chronogolf is unreachable.
+ * The live Chronogolf course directory around a market, plus whether it was
+ * read completely. Only a complete read is cached (6 h); a failed or truncated
+ * read falls back to the last complete one, or is reported as not ok so the
+ * search never presents a partial directory as "everything".
  */
-export async function getChronogolfCourses(market: MarketId = "montreal"): Promise<GolfCourse[]> {
-  if (DISABLED) return [];
+export async function getChronogolfDirectory(
+  market: MarketId = "montreal",
+): Promise<{ courses: GolfCourse[]; state: ProviderState }> {
+  if (DISABLED) return { courses: [], state: { status: "unavailable", detail: "disabled" } };
   const now = Date.now();
   const cached = directoryCache.get(market);
   if (cached && now - cached.at < DIRECTORY_TTL_S * 1000) {
-    return cached.courses;
+    return { courses: cached.courses, state: { status: "ok" } };
   }
 
   const courses: GolfCourse[] = [];
   const marketConfig = getMarket(market);
   const radiusKm = radiusForMarket(market);
-  for (let page = 1; page <= 6; page++) {
+  let failure: ProviderState | null = null;
+  let complete = false;
+  for (let page = 1; page <= MAX_DIRECTORY_PAGES; page++) {
     const url =
       `${BASE}/search?location[lat]=${marketConfig.center.lat}` +
       `&location[lon]=${marketConfig.center.lng}&location[distance]=${radiusKm}` +
       `&published=true&page=${page}`;
     const batch = await request<SearchCourse[]>(url, { ttl: DIRECTORY_TTL_S });
-    if (!batch.ok || !Array.isArray(batch.data) || batch.data.length === 0) break;
+    if (!batch.ok || !Array.isArray(batch.data)) {
+      failure = batch.ok
+        ? { status: "unavailable", detail: "unexpected directory response" }
+        : batch.throttled
+          ? { status: "throttled", retryAfterSec: batch.retryAfterSec }
+          : { status: "unavailable", ...(batch.detail ? { detail: batch.detail } : {}) };
+      break;
+    }
     for (const c of batch.data) {
       const mapped = toCourse(market, c);
       if (mapped) courses.push(mapped);
     }
-    if (batch.data.length < 25) break;
+    if (batch.data.length < 25) {
+      complete = true;
+      break;
+    }
   }
-
-  if (courses.length === 0) {
-    // keep any previous good cache rather than wiping it
-    return cached?.courses ?? [];
-  }
+  if (!complete && !failure) failure = { status: "partial", detail: `directory longer than ${MAX_DIRECTORY_PAGES} pages` };
 
   // de-dupe by uuid
   const seen = new Map<string, GolfCourse>();
   for (const c of courses) if (!seen.has(c.id)) seen.set(c.id, c);
   const list = [...seen.values()];
-  directoryCache.set(market, { at: now, courses: list });
-  return list;
+
+  if (complete && list.length > 0) {
+    directoryCache.set(market, { at: now, courses: list });
+    return { courses: list, state: { status: "ok" } };
+  }
+  // A previous complete directory beats a partial one; course lists change rarely.
+  if (cached) return { courses: cached.courses, state: { status: "ok" } };
+  const state: ProviderState = failure ?? { status: "unavailable", detail: "empty directory" };
+  return {
+    courses: list,
+    state: list.length && state.status === "unavailable" ? { ...state, status: "partial" } : state,
+  };
+}
+
+/** The live Chronogolf course directory (see `getChronogolfDirectory`). */
+export async function getChronogolfCourses(market: MarketId = "montreal"): Promise<GolfCourse[]> {
+  return (await getChronogolfDirectory(market)).courses;
 }
 
 function pad(t: string): { time: string; minutes: number } | null {
@@ -352,8 +380,9 @@ function parseRow(course: GolfCourse, date: string, t: Teetime): TeeTime | null 
   const holes = t.default_price?.bookable_holes;
   if (holes !== 9 && holes !== 18) return null;
   return {
-    // Stable + unique per (course, date, round length, tee time).
-    id: `${course.id}-${date}-live-${holes}-${parsed.minutes}`,
+    // Stable + unique per (club, date, round length, tee time, course within
+    // the club): multi-course clubs can list the same minute on two courses.
+    id: `${course.id}-${date}-live-${holes}-${parsed.minutes}${t.course?.uuid ? `-${t.course.uuid}` : ""}`,
     courseId: course.id,
     date,
     time: parsed.time,
@@ -421,7 +450,16 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out;
 }
 
-type BatchOutcome = { rows: TeeTime[]; answered: boolean; throttled: boolean; retryAfterSec?: number; detail?: string };
+type BatchOutcome = {
+  rows: TeeTime[];
+  /** At least one page answered. */
+  answered: boolean;
+  /** Every page up to the last one was read; nothing is missing. */
+  complete: boolean;
+  throttled: boolean;
+  retryAfterSec?: number;
+  detail?: string;
+};
 
 async function fetchBatch(
   courseUuids: string[],
@@ -441,19 +479,22 @@ async function fetchBatch(
     );
     if (!res.ok) {
       // A failed later page still leaves the earlier pages' rows usable.
-      return { rows, answered: page > 1, throttled: res.throttled, retryAfterSec: res.retryAfterSec, detail: res.detail };
+      return { rows, answered: page > 1, complete: false, throttled: res.throttled, retryAfterSec: res.retryAfterSec, detail: res.detail };
     }
     const data = res.data;
     if (data?.status !== "open" && data?.status !== "closed") {
-      return { rows, answered: page > 1, throttled: false, detail: `unexpected sheet status ${JSON.stringify(data?.status ?? null).slice(0, 40)}` };
+      return { rows, answered: page > 1, complete: false, throttled: false, detail: `unexpected sheet status ${JSON.stringify(data?.status ?? null).slice(0, 40)}` };
     }
     rows.push(...parseBatchResponse(byCourseUuid, date, data));
     const count = Array.isArray(data.teetimes) ? data.teetimes.length : 0;
     if (page === 1) pageSize = count;
     // Rows are time-sorted and end_time bounds them, so a short page is the last.
-    if (count === 0 || count < pageSize || data.status === "closed") break;
+    if (count === 0 || count < pageSize || data.status === "closed") {
+      return { rows, answered: true, complete: true, throttled: false };
+    }
   }
-  return { rows, answered: true, throttled: false };
+  // Still full pages after MAX_PAGES: later tee times exist that weren't read.
+  return { rows, answered: true, complete: false, throttled: false, detail: `more than ${MAX_PAGES} pages of tee times` };
 }
 
 /**
@@ -508,7 +549,7 @@ export async function fetchChronogolfWindow(
 
   const answered = outcomes.filter((o) => o.answered).length;
   const throttled = outcomes.find((o) => o.throttled);
-  const complete = outcomes.every((o) => o.answered && !o.throttled) && unresolved === 0;
+  const complete = outcomes.every((o) => o.complete) && unresolved === 0;
   let state: ProviderState;
   if (complete) state = { status: "ok" };
   else if (throttled) {

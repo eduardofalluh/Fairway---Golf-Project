@@ -1,5 +1,6 @@
 import { EXTRA_COURSES } from "./courses";
-import { fetchChronogolfWindow, getChronogolfCourses } from "./providers/chronogolf";
+import { fetchChronogolfWindow, getChronogolfDirectory } from "./providers/chronogolf";
+import { mergeProviderStates } from "./results";
 import { fetchTeeTimeWindow } from "./providers/teetime";
 import { parseTimeToMinutes } from "./format";
 import { deepBookingUrl } from "./booking-links";
@@ -26,10 +27,13 @@ const norm = (s: string) =>
 
 /**
  * The full course directory: live Chronogolf courses + curated non-Chronogolf
- * extras (extras dropped if a live course already covers the same name).
+ * extras (extras dropped if a live course already covers the same name), and
+ * whether the Chronogolf part was read completely.
  */
-export async function getDirectory(market: MarketId = "montreal"): Promise<GolfCourse[]> {
-  const live = await getChronogolfCourses(market);
+export async function getDirectoryWithState(
+  market: MarketId = "montreal",
+): Promise<{ courses: GolfCourse[]; chronogolf: ProviderState }> {
+  const { courses: live, state } = await getChronogolfDirectory(market);
   const liveNames = new Set(live.map((c) => norm(c.name)));
   const marketExtras = EXTRA_COURSES.filter((course) => course.market === market);
   const curatedByName = new Map(marketExtras.map((c) => [norm(c.name), c]));
@@ -49,7 +53,14 @@ export async function getDirectory(market: MarketId = "montreal"): Promise<GolfC
   const extras = marketExtras.filter(
     (e) => !liveNames.has(norm(e.name)) && !usedCurated.has(norm(e.name)),
   );
-  return [...directory, ...extras].sort((a, b) => a.distanceKm - b.distanceKm);
+  return {
+    courses: [...directory, ...extras].sort((a, b) => a.distanceKm - b.distanceKm),
+    chronogolf: state,
+  };
+}
+
+export async function getDirectory(market: MarketId = "montreal"): Promise<GolfCourse[]> {
+  return (await getDirectoryWithState(market)).courses;
 }
 
 export async function findCourse(market: MarketId, courseId: string): Promise<GolfCourse | null> {
@@ -83,7 +94,7 @@ export function windowBounds(query: Pick<WindowQuery, "desiredTime" | "windowMin
  * not already loaded; identical ranges share cached provider pages.
  */
 export async function searchPart(query: RangeQuery): Promise<TeeTimePartResponse> {
-  const directory = await getDirectory(query.market);
+  const { courses: directory, chronogolf: directoryState } = await getDirectoryWithState(query.market);
   const courses = coursesForPart(liveFeedCourses(directory), query.part, query.parts);
   const { startMin, endMin } = query;
   const byId = new Map(courses.map((c) => [c.id, c]));
@@ -94,7 +105,15 @@ export async function searchPart(query: RangeQuery): Promise<TeeTimePartResponse
   ]);
 
   const providers: Partial<Record<ProviderId, ProviderState>> = {};
-  if (courses.some((c) => c.source === "chronogolf")) providers.chronogolf = chronogolf.state;
+  // If the directory itself wasn't fully read, this part can't be complete —
+  // even when it has no Chronogolf courses left to ask about.
+  if (courses.some((c) => c.source === "chronogolf")) {
+    providers.chronogolf = directoryState.status === "ok"
+      ? chronogolf.state
+      : mergeProviderStates([directoryState, chronogolf.state]) ?? directoryState;
+  } else if (directoryState.status !== "ok") {
+    providers.chronogolf = directoryState;
+  }
   if (courses.some((c) => c.source === "teetime")) providers.teetime = teetime.state;
 
   const teeTimes: TeeTime[] = [];

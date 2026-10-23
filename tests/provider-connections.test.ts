@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   addConnectionMarks,
+  consumePendingSignIn,
+  PENDING_SIGNIN_TTL_MS,
+  startPendingSignIn,
   CONNECTION_TTL_MS,
   connectionDaysLeft,
   connectionMarkedAt,
@@ -18,6 +21,7 @@ import {
   parseProviderConnectionCallback,
   providerLoginUrlWithReturn,
 } from '../src/lib/provider-callback';
+import { getBookingProvider } from '../src/lib/providers/config';
 
 test('central provider connections are provider-wide', () => {
   assert.equal(providerConnectionKey('chronogolf', 'https://www.chronogolf.com/login'), 'provider:chronogolf');
@@ -72,20 +76,22 @@ test('legacy saved connection keys still work after key normalization', () => {
 });
 
 
+const NONCE = '123e4567-e89b-42d3-a456-426614174000';
+
 test('provider return callback marks only the matching provider as connected', () => {
   const href = 'https://www.chronogolf.com/login?returnUrl=https%3A%2F%2Fwww.chronogolf.com%2F';
-  const returnUrl = buildFairwayConnectionReturnUrl('chronogolf', href, 'https://fairway.example/#accounts');
+  const returnUrl = buildFairwayConnectionReturnUrl('chronogolf', href, 'https://fairway.example/?date=2099-07-10#results', NONCE);
   const loginUrl = providerLoginUrlWithReturn('chronogolf', href, returnUrl);
   const providerReturn = new URL(loginUrl).searchParams.get('returnUrl') ?? '';
 
   assert.equal(providerReturn, returnUrl);
-  assert.deepEqual(parseProviderConnectionCallback(providerReturn), { providerId: 'chronogolf', href });
-  assert.equal(cleanProviderConnectionCallbackUrl(providerReturn), '/#accounts');
+  assert.deepEqual(parseProviderConnectionCallback(providerReturn), { providerId: 'chronogolf', href, nonce: NONCE });
+  assert.equal(cleanProviderConnectionCallbackUrl(providerReturn), '/?date=2099-07-10#results', 'back to the same search and spot');
 });
 
 test('provider return callback rejects unsafe or mismatched hrefs', () => {
   const unsafe = 'https://fairway.example/?fairwayConnectedProvider=chronogolf&fairwayConnectedHref=javascript%3Aalert(1)#accounts';
-  const mismatch = buildFairwayConnectionReturnUrl('chronogolf', 'https://tee-time.com/login', 'https://fairway.example/#accounts');
+  const mismatch = buildFairwayConnectionReturnUrl('chronogolf', 'https://tee-time.com/login', 'https://fairway.example/#accounts', NONCE);
 
   assert.equal(parseProviderConnectionCallback(unsafe), null);
   assert.equal(parseProviderConnectionCallback(mismatch), null);
@@ -118,4 +124,47 @@ test('marking again refreshes the time and keeps one entry per provider', () => 
   const club = addConnectionMarks(again, providerConnectionKeys('gggolf', 'https://secure.gggolf.ca/cerf/index.php'), 5000);
   assert.equal(connectionMarkedAt(club, 'gggolf', 'https://secure.gggolf.ca/cerf/teesheet'), 5000);
   assert.equal(connectionMarkedAt(club, 'gggolf', 'https://secure.gggolf.ca/atlantide/index.php'), null);
+});
+
+
+function memoryStore() {
+  const data = new Map<string, string>();
+  return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) };
+}
+
+test('a crafted return link without this browser\'s one-time code marks nothing', () => {
+  const crafted = 'https://fairway.example/?fairwayConnectedProvider=chronogolf&fairwayConnectedHref=https%3A%2F%2Fwww.chronogolf.com%2F';
+  assert.equal(parseProviderConnectionCallback(crafted), null, 'no code, no callback');
+  const store = memoryStore();
+  assert.equal(consumePendingSignIn('chronogolf', NONCE, 1000, store), false, 'a code this browser never issued is refused');
+});
+
+test('a sign-in started here is accepted once, for that provider, within 30 minutes', () => {
+  const store = memoryStore();
+  const nonce = startPendingSignIn('chronogolf', 1000, store);
+  assert.equal(consumePendingSignIn('teetime', nonce, 2000, store), false, 'wrong provider');
+  assert.equal(consumePendingSignIn('chronogolf', nonce, 2000, store), true);
+  assert.equal(consumePendingSignIn('chronogolf', nonce, 3000, store), false, 'single use');
+  const late = startPendingSignIn('chronogolf', 1000, store);
+  assert.equal(consumePendingSignIn('chronogolf', late, 1000 + PENDING_SIGNIN_TTL_MS + 1, store), false, 'expired');
+});
+
+test('look-alike hosts are not treated as Jonas tee sheets', () => {
+  assert.equal(getBookingProvider('https://watsonsglengc.clubhouseonline-e3.net/PublicTeeTimes/TeeSheet.aspx').id, 'jonas');
+  assert.equal(getBookingProvider('https://clubhouseonline.attacker.example/').id, 'course');
+  assert.equal(getBookingProvider('https://evilclubhouseonline-e3.net/').id, 'course');
+});
+
+test('each provider keeps one mark: the count is right and Forget clears it everywhere', () => {
+  const clubLink = 'https://tee-time.com/clubs/pickering-glen-golf-club?date=2099-07-10';
+  let marks = addConnectionMarks([], providerConnectionKeys('teetime', clubLink), 1000);
+  marks = addConnectionMarks(marks, providerConnectionKeys('teetime', 'https://tee-time.com/clubs/other?date=2099-07-11'), 2000);
+  assert.deepEqual(marks.map((m) => m.key), ['provider:teetime']);
+  assert.equal(countConnectedProviders(marks.map((m) => m.key)), 1);
+  // "Forget" from the accounts card uses the login URL, not the club link.
+  const removals = new Set(providerConnectionKeys('teetime', 'https://tee-time.com/login'));
+  const after = marks.filter((m) => !removals.has(m.key));
+  assert.equal(connectionMarkedAt(after, 'teetime', clubLink), null);
+  // Older per-URL keys saved by previous versions collapse too.
+  assert.deepEqual(normalizeConnectedProviderKeys(['teetime:https://tee-time.com/clubs/x', 'golfnow:https://www.golfnow.com/']), ['provider:teetime', 'provider:golfnow']);
 });

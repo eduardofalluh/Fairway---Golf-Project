@@ -7,8 +7,12 @@ import { safeBookingUrl } from '../src/lib/providers/config';
 import { POST as verify } from '../src/app/api/verify/route';
 import { POST as book } from '../src/app/api/book/route';
 import { fakeChronogolf, row } from './helpers';
+import { addDaysISO, todayISO } from '../src/lib/format';
 
-const slot = { market: 'montreal', courseId: 'club-st-rose', date: '2099-07-10', time: '06:30', holes: 18, players: 2, price: 72 };
+/** A date inside the bookable range (today … +60 days). */
+const SLOT_DATE = addDaysISO(todayISO(), 1);
+
+const slot = { market: 'montreal', courseId: 'club-st-rose', date: SLOT_DATE, time: '06:30', holes: 18, players: 2, price: 72 };
 const post = (url: string, body: string, headers: Record<string, string>) =>
   new Request(url, { method: 'POST', headers, body });
 
@@ -53,7 +57,7 @@ test('POST bodies must be same-origin JSON under the size cap', async () => {
 });
 
 test('cross-site requests never reach providers', async () => {
-  const fake = fakeChronogolf({ teetimes: () => Response.json({ status: 'open', teetimes: [row('course-st-rose', '2099-07-10', '06:30')] }) });
+  const fake = fakeChronogolf({ teetimes: () => Response.json({ status: 'open', teetimes: [row('course-st-rose', SLOT_DATE, '06:30')] }) });
   try {
     const form = await verify(post('http://localhost/api/verify', JSON.stringify(slot), { 'Content-Type': 'text/plain', Origin: 'https://evil.example' }));
     assert.equal(form.status, 415);
@@ -77,7 +81,7 @@ test('one caller cannot spray reminder emails across many addresses', async () =
   const original = process.env.RESEND_API_KEY;
   process.env.RESEND_API_KEY = 'test-only-not-a-real-key';
   const fake = fakeChronogolf({
-    teetimes: () => Response.json({ status: 'open', teetimes: [row('course-st-rose', '2099-07-10', '06:30')] }),
+    teetimes: () => Response.json({ status: 'open', teetimes: [row('course-st-rose', SLOT_DATE, '06:30')] }),
     other: (url) => (url.hostname === 'api.resend.com' ? Response.json({ id: 'sent' }) : undefined),
   });
   try {

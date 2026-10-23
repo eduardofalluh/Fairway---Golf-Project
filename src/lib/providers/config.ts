@@ -227,7 +227,8 @@ export function getBookingProvider(bookingUrl: string): BookingProviderConfig {
     if (hostname === "linklineonline.ca" || hostname.endsWith(".linklineonline.ca")) {
       return BOOKING_PROVIDERS.linkline;
     }
-    if (hostname.includes("clubhouseonline")) {
+    // Jonas Club Software public tee sheets live on *.clubhouseonline-e3.net only.
+    if (hostname === "clubhouseonline-e3.net" || hostname.endsWith(".clubhouseonline-e3.net")) {
       return BOOKING_PROVIDERS.jonas;
     }
     if (hostname === "clublink.ca" || hostname.endsWith(".clublink.ca")) {

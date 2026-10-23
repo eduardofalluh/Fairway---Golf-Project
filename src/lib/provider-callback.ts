@@ -3,6 +3,7 @@ import { getBookingProvider, safeBookingUrl } from "./providers/config";
 
 export const CONNECTED_PROVIDER_PARAM = "fairwayConnectedProvider";
 export const CONNECTED_HREF_PARAM = "fairwayConnectedHref";
+export const CONNECTED_NONCE_PARAM = "fairwayConnectNonce";
 
 const PROVIDER_IDS = new Set<BookingProviderId>([
   "chronogolf",
@@ -21,6 +22,8 @@ const PROVIDER_IDS = new Set<BookingProviderId>([
 export type ProviderConnectionCallback = {
   providerId: Exclude<BookingProviderId, "course">;
   href: string;
+  /** One-time code from `startPendingSignIn`; required to accept the return. */
+  nonce: string;
 };
 
 export function isConnectableProviderId(
@@ -29,15 +32,18 @@ export function isConnectableProviderId(
   return Boolean(value && PROVIDER_IDS.has(value as BookingProviderId));
 }
 
+/** Where the provider should send the golfer back: the same page and spot. */
 export function buildFairwayConnectionReturnUrl(
   providerId: Exclude<BookingProviderId, "course">,
   href: string,
   currentHref: string,
+  nonce: string,
 ) {
   const url = new URL(currentHref);
   url.searchParams.set(CONNECTED_PROVIDER_PARAM, providerId);
   url.searchParams.set(CONNECTED_HREF_PARAM, href);
-  url.hash = "accounts";
+  url.searchParams.set(CONNECTED_NONCE_PARAM, nonce);
+  url.hash ||= "accounts";
   return url.toString();
 }
 
@@ -60,13 +66,17 @@ export function parseProviderConnectionCallback(
   const provider = getBookingProvider(href);
   if (provider.id !== providerId) return null;
 
-  return { providerId, href };
+  const nonce = url.searchParams.get(CONNECTED_NONCE_PARAM) ?? "";
+  if (!/^[0-9a-f-]{36}$/i.test(nonce)) return null;
+
+  return { providerId, href, nonce };
 }
 
 export function cleanProviderConnectionCallbackUrl(currentHref: string) {
   const url = new URL(currentHref);
   url.searchParams.delete(CONNECTED_PROVIDER_PARAM);
   url.searchParams.delete(CONNECTED_HREF_PARAM);
+  url.searchParams.delete(CONNECTED_NONCE_PARAM);
   return `${url.pathname}${url.search}${url.hash}`;
 }
 

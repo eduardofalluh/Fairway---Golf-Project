@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { POST } from '../src/app/api/book/route';
 import { fakeChronogolf, row } from './helpers';
+import { addDaysISO, todayISO } from '../src/lib/format';
+
+/** A date inside the bookable range (today … +60 days). */
+const SLOT_DATE = addDaysISO(todayISO(), 1);
 
 const request = (body: unknown, ip = '10.1.0.1') => new Request('http://localhost/api/book', {
   method: 'POST',
@@ -13,14 +17,14 @@ const slot = {
   email: 'test@example.com',
   market: 'montreal',
   courseId: 'club-st-rose',
-  date: '2099-07-10',
+  date: SLOT_DATE,
   time: '06:30',
   holes: 18,
   players: 2,
   price: 72,
 };
 
-const openSheet = () => Response.json({ status: 'open', teetimes: [row('course-st-rose', '2099-07-10', '06:30')] });
+const openSheet = () => Response.json({ status: 'open', teetimes: [row('course-st-rose', SLOT_DATE, '06:30')] });
 
 async function withResendKey<T>(fn: () => Promise<T>): Promise<T> {
   const original = process.env.RESEND_API_KEY;
@@ -94,8 +98,10 @@ test('a sent email uses the server-built provider link and is never called a boo
     const response = await withResendKey(() => POST(request({ ...slot, bookingUrl: 'https://evil.example/' }, '10.1.0.4')));
     assert.equal(response.status, 200);
     const json = await response.json();
-    assert.equal(json.bookingUrl, 'https://www.chronogolf.com/club/golf-sainte-rose?date=2099-07-10&nb_holes=18');
+    assert.equal(json.bookingUrl, `https://www.chronogolf.com/club/golf-sainte-rose?date=${SLOT_DATE}&nb_holes=18`);
     assert.match(sentHtml, /not a booking confirmation/);
+    assert.match(sentHtml, /Continue on Chronogolf/);
+    assert.doesNotMatch(sentHtml, />\s*Book/);
     assert.doesNotMatch(sentHtml, /evil\.example/);
   } finally {
     globalThis.fetch = realFetch;
@@ -112,6 +118,22 @@ test('email endpoint rate-limits repeated reminder sends', async () => {
     const statuses: number[] = [];
     await withResendKey(async () => {
       for (let i = 0; i < 6; i++) statuses.push((await POST(request({ ...slot, email: 'rate-limit@example.com' }, '10.1.0.5'))).status);
+    });
+    assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429]);
+  } finally {
+    fake.restore();
+  }
+});
+
+test('one inbox cannot be flooded by rotating IPs', async () => {
+  const fake = fakeChronogolf({
+    teetimes: openSheet,
+    other: (url) => (url.hostname === 'api.resend.com' ? Response.json({ id: 'sent' }) : undefined),
+  });
+  try {
+    const statuses: number[] = [];
+    await withResendKey(async () => {
+      for (let i = 0; i < 6; i++) statuses.push((await POST(request({ ...slot, email: 'victim@example.com' }, `10.9.0.${i}`))).status);
     });
     assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429]);
   } finally {

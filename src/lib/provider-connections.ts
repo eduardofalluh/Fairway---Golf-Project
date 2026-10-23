@@ -43,6 +43,16 @@ export function providerConnectionKeys(
   ]);
 }
 
+/** Providers whose sign-in is one account everywhere (GGGolf is per club). */
+const PROVIDER_WIDE: ReadonlySet<string> = new Set<BookingProviderId>([
+  "chronogolf", "teetime", "golfthe6ix", "golfnow", "ezlinks", "teeitup", "linkline", "jonas", "clublink", "minutegolf",
+]);
+
+/**
+ * One canonical key per provider (or per GGGolf club). Older or per-URL keys
+ * such as `teetime:https://…` collapse onto `provider:teetime`, so counts are
+ * right and "Forget" removes the provider everywhere.
+ */
 export function normalizeConnectedProviderKeys(keys: string[]) {
   const normalized = new Set<string>();
   for (const key of keys) {
@@ -50,12 +60,9 @@ export function normalizeConnectedProviderKeys(keys: string[]) {
       normalized.add(key);
       continue;
     }
-    if (key.startsWith("chronogolf:")) {
-      normalized.add("provider:chronogolf");
-      continue;
-    }
-    if (key.startsWith("minutegolf:")) {
-      normalized.add("provider:minutegolf");
+    const prefix = key.slice(0, key.indexOf(":"));
+    if (PROVIDER_WIDE.has(prefix)) {
+      normalized.add(`provider:${prefix}`);
       continue;
     }
     if (key.startsWith("gggolf:")) {
@@ -156,4 +163,77 @@ export function writeConnectionMarks(marks: ConnectionMark[]) {
   window.dispatchEvent(
     new CustomEvent<ConnectionMark[]>(PROVIDER_CONNECTIONS_CHANGED, { detail: marks }),
   );
+}
+
+/**
+ * A sign-in this browser started. The provider's return link must carry the
+ * same one-time code, so a crafted link can't mark anyone as signed in.
+ */
+interface PendingSignIn {
+  providerId: string;
+  nonce: string;
+  at: number;
+}
+
+export const PENDING_SIGNIN_KEY = "fairway-pending-signins";
+export const PENDING_SIGNIN_TTL_MS = 30 * 60 * 1000;
+
+type KeyValueStore = Pick<Storage, "getItem" | "setItem">;
+
+function browserStore(): KeyValueStore | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function readPending(store: KeyValueStore, now: number): PendingSignIn[] {
+  try {
+    const parsed: unknown = JSON.parse(store.getItem(PENDING_SIGNIN_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (p): p is PendingSignIn =>
+        Boolean(p) && typeof p.providerId === "string" && typeof p.nonce === "string" &&
+        typeof p.at === "number" && now - p.at < PENDING_SIGNIN_TTL_MS && p.at <= now + 60_000,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Remember that the golfer is about to sign in; returns the code for the return link. */
+export function startPendingSignIn(
+  providerId: string,
+  now = Date.now(),
+  store: KeyValueStore | null = browserStore(),
+): string {
+  const nonce = globalThis.crypto.randomUUID();
+  if (store) {
+    const pending = [...readPending(store, now), { providerId, nonce, at: now }].slice(-10);
+    try {
+      store.setItem(PENDING_SIGNIN_KEY, JSON.stringify(pending));
+    } catch {
+      // Without storage the return simply won't be recognised.
+    }
+  }
+  return nonce;
+}
+
+/** True once for a fresh code this browser issued for this provider. */
+export function consumePendingSignIn(
+  providerId: string,
+  nonce: string,
+  now = Date.now(),
+  store: KeyValueStore | null = browserStore(),
+): boolean {
+  if (!store || !nonce) return false;
+  const pending = readPending(store, now);
+  const match = pending.find((p) => p.providerId === providerId && p.nonce === nonce);
+  try {
+    store.setItem(PENDING_SIGNIN_KEY, JSON.stringify(pending.filter((p) => p !== match)));
+  } catch {
+    // Ignore: the code is single-use only where storage works.
+  }
+  return Boolean(match);
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { minutesToHHMM, parseTimeToMinutes } from "./format";
 import { mergeProviderStates } from "./results";
+import { addEntry, pruneEntries, rangesToFetch, visibleRows, type RangeEntry } from "./range-cache";
 import { SEARCH_PARTS, windowQueryKey } from "./search-state";
 import type {
   ProviderId,
@@ -39,47 +40,28 @@ const EMPTY: SearchSnapshot = {
 };
 
 /**
- * Minutes already loaded per market and day. Providers rate-limit hard, so a
- * new search only asks for the part of its window that isn't here yet.
+ * What each search part returned per minute range, per market and day.
+ * Providers rate-limit hard, so a new search only asks for the part of its
+ * window that isn't here yet; rows expire with the range that fetched them.
  */
 interface DayCache {
-  rows: Map<string, TeeTime>;
-  /** Fully answered ranges, per search part, so a retry only re-asks what failed. */
-  ranges: Array<{ part: number; start: number; end: number; at: number }>;
+  entries: RangeEntry[];
   checkedCourses: number[];
 }
 
-const RANGE_TTL_MS = 3 * 60_000;
 const days = new Map<string, DayCache>();
 
 function dayCache(key: string): DayCache {
-  const now = Date.now();
   let day = days.get(key);
-  if (day) {
-    day.ranges = day.ranges.filter((r) => now - r.at < RANGE_TTL_MS);
-    if (day.ranges.length === 0) day = undefined;
-  }
   if (!day) {
-    day = { rows: new Map(), ranges: [], checkedCourses: [] };
+    day = { entries: [], checkedCourses: [] };
     days.set(key, day);
   }
+  day.entries = pruneEntries(day.entries, Date.now());
   return day;
 }
 
-/** The parts of [start, end] not covered by any loaded range. */
-export function missingRanges(start: number, end: number, loaded: Array<{ start: number; end: number }>) {
-  let gaps: Array<[number, number]> = [[start, end]];
-  for (const r of loaded) {
-    gaps = gaps.flatMap(([s, e]): Array<[number, number]> => {
-      if (r.end < s || r.start > e) return [[s, e]];
-      const out: Array<[number, number]> = [];
-      if (r.start > s) out.push([s, r.start - 1]);
-      if (r.end < e) out.push([r.end + 1, e]);
-      return out;
-    });
-  }
-  return gaps.filter(([s, e]) => e >= s);
-}
+export { missingRanges } from "./range-cache";
 
 function mergeProviders(responses: TeeTimePartResponse[]) {
   const byProvider = new Map<ProviderId, ProviderState[]>();
@@ -114,8 +96,7 @@ export function useTeeTimeSearch(query: WindowQuery | null) {
     const end = Math.min(23 * 60 + 59, desired + query.windowMinutes);
     const requests: Array<{ part: number; start: number; end: number }> = [];
     for (let part = 0; part < SEARCH_PARTS; part++) {
-      const loaded = day.ranges.filter((r) => r.part === part);
-      for (const [gapStart, gapEnd] of missingRanges(start, end, loaded)) {
+      for (const [gapStart, gapEnd] of rangesToFetch(day.entries, part, start, end)) {
         requests.push({ part, start: gapStart, end: gapEnd });
       }
     }
@@ -129,7 +110,7 @@ export function useTeeTimeSearch(query: WindowQuery | null) {
         ...EMPTY,
         key,
         status: "done",
-        teeTimes: [...day.rows.values()],
+        teeTimes: visibleRows(day.entries),
         partsDone: SEARCH_PARTS,
         checkedCourses: checked(),
       });
@@ -143,7 +124,7 @@ export function useTeeTimeSearch(query: WindowQuery | null) {
     let failures = 0;
     let busy = false;
     // Rows already loaded for the overlap show immediately while the gaps load.
-    setSnapshot({ ...EMPTY, key, status: "loading", teeTimes: [...day.rows.values()], parts: total });
+    setSnapshot({ ...EMPTY, key, status: "loading", teeTimes: visibleRows(day.entries), parts: total });
 
     const finish = () => {
       if (controller.signal.aborted) return;
@@ -152,7 +133,7 @@ export function useTeeTimeSearch(query: WindowQuery | null) {
       setSnapshot({
         key,
         status: done < total ? "loading" : allFailed && !busy ? "error" : "done",
-        teeTimes: [...day.rows.values()],
+        teeTimes: visibleRows(day.entries),
         providers: mergeProviders(responses),
         partsDone: done,
         parts: total,
@@ -179,12 +160,15 @@ export function useTeeTimeSearch(query: WindowQuery | null) {
           }
           if (!res.ok) throw new Error(String(res.status));
           const json = (await res.json()) as TeeTimePartResponse;
-          for (const row of json.teeTimes) day.rows.set(row.id, row);
           day.checkedCourses[request.part] = json.checkedCourses;
-          // Only a range every provider fully answered counts as loaded.
-          if (Object.values(json.providers).every((p) => p.status === "ok")) {
-            day.ranges.push({ ...request, at: Date.now() });
-          }
+          // This answer replaces whatever the part had for these minutes. Only
+          // a range every provider fully answered counts as loaded.
+          day.entries = addEntry(day.entries, {
+            ...request,
+            at: Date.now(),
+            complete: Object.values(json.providers).every((p) => p.status === "ok"),
+            rows: json.teeTimes,
+          });
           responses.push(json);
         })
         .catch(() => {

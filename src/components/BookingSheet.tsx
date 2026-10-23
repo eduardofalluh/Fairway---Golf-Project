@@ -10,6 +10,7 @@ import { formatDaysAgo, formatLongDateForLanguage, formatTimeForLanguage, timePa
 import { getBookingProvider, PROVIDER_ACCOUNT_LINKS } from "@/lib/providers/config";
 import { useProfile } from "@/lib/useProfile";
 import { useProviderConnections } from "@/lib/useProviderConnections";
+import { resultForOpening } from "@/lib/slot-check";
 import { openProviderLogin } from "./BookingAccounts";
 import type { TeeTimeResult } from "@/lib/types";
 
@@ -42,11 +43,11 @@ function DrawnCheck() {
 }
 
 function useSlotCheck(tee: TeeTimeResult | null, market: string): Check {
-  const [result, setResult] = useState<{ id: string; check: Check } | null>(null);
+  const [result, setResult] = useState<{ opening: TeeTimeResult; check: Check } | null>(null);
   useEffect(() => {
     if (!tee) return;
     const controller = new AbortController();
-    const setCheck = (check: Check) => setResult({ id: tee.id, check });
+    const setCheck = (check: Check) => setResult({ opening: tee, check });
     fetch("/api/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -76,8 +77,8 @@ function useSlotCheck(tee: TeeTimeResult | null, market: string): Check {
       });
     return () => controller.abort();
   }, [tee, market]);
-  // Never show a previous slot's link while this one is being checked.
-  return result && tee && result.id === tee.id ? result.check : { state: "checking" };
+  // Never show an earlier check's link, even for the same slot reopened later.
+  return resultForOpening(result, tee, { state: "checking" } as Check);
 }
 
 function EmailDetails({ tee, market }: { tee: TeeTimeResult; market: string }) {

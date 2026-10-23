@@ -2,7 +2,8 @@ import { deepBookingUrl, findCourse } from "./aggregator";
 import { fetchChronogolfWindow } from "./providers/chronogolf";
 import { fetchTeeTimeCourseTeeTimes } from "./providers/teetime";
 import { parseTimeToMinutes } from "./format";
-import { isCalendarDate, isClockTime } from "./search-query";
+import { isCalendarDate, isClockTime, MAX_DAYS_AHEAD } from "./search-query";
+import { addDaysISO, todayISO } from "./format";
 import { MARKET_IDS, type GolfCourse, type MarketId, type TeeTime } from "./types";
 
 export interface SlotRequest {
@@ -25,13 +26,17 @@ export type LiveVerificationResult =
       bookingUrl?: string;
     };
 
-/** Strictly read a slot request from an untrusted JSON body. */
-export function readSlotRequest(body: unknown): SlotRequest | null {
+/**
+ * Strictly read a slot request from an untrusted JSON body. Dates are limited
+ * to the bookable range so nonsense dates never cost a provider call.
+ */
+export function readSlotRequest(body: unknown, today = todayISO()): SlotRequest | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const b = body as Record<string, unknown>;
   if (typeof b.market !== "string" || !MARKET_IDS.includes(b.market as MarketId)) return null;
   if (typeof b.courseId !== "string" || b.courseId.length === 0 || b.courseId.length > 120) return null;
   if (typeof b.date !== "string" || !isCalendarDate(b.date)) return null;
+  if (b.date < today || b.date > addDaysISO(today, MAX_DAYS_AHEAD)) return null;
   if (typeof b.time !== "string" || !isClockTime(b.time)) return null;
   if (b.holes !== 9 && b.holes !== 18) return null;
   if (typeof b.players !== "number" || !Number.isInteger(b.players) || b.players < 1 || b.players > 4) return null;

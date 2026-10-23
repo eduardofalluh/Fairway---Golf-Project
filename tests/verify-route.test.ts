@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { POST } from '../src/app/api/verify/route';
 import { fakeChronogolf, row } from './helpers';
+import { addDaysISO, todayISO } from '../src/lib/format';
+
+/** A date inside the bookable range (today … +60 days). */
+const SLOT_DATE = addDaysISO(todayISO(), 1);
 
 const request = (body: unknown, ip = '10.2.0.1') => new Request('http://localhost/api/verify', {
   method: 'POST',
@@ -9,12 +13,12 @@ const request = (body: unknown, ip = '10.2.0.1') => new Request('http://localhos
   body: JSON.stringify(body),
 });
 
-const slot = { market: 'montreal', courseId: 'club-st-rose', date: '2099-07-10', time: '06:30', holes: 18, players: 2, price: 72 };
+const slot = { market: 'montreal', courseId: 'club-st-rose', date: SLOT_DATE, time: '06:30', holes: 18, players: 2, price: 72 };
 
 test('verify rejects malformed slots before any provider call', async () => {
   const fake = fakeChronogolf({ teetimes: () => { throw new Error('should not be called'); } });
   try {
-    for (const body of [null, {}, { ...slot, holes: 12 }, { ...slot, players: 5 }, { ...slot, date: '2099-02-30' }]) {
+    for (const body of [null, {}, { ...slot, holes: 12 }, { ...slot, players: 5 }, { ...slot, date: '2099-02-30' }, { ...slot, date: '2020-01-01' }, { ...slot, date: '2099-07-10' }]) {
       assert.equal((await POST(request(body))).status, 400);
     }
     assert.equal(fake.calls.length, 0);
@@ -35,12 +39,12 @@ test('verify only knows courses from the server-side directory', async () => {
 });
 
 test('verify re-checks just that minute, fresh, and returns the official deep link', async () => {
-  const fake = fakeChronogolf({ teetimes: () => Response.json({ status: 'open', teetimes: [row('course-st-rose', '2099-07-10', '06:30')] }) });
+  const fake = fakeChronogolf({ teetimes: () => Response.json({ status: 'open', teetimes: [row('course-st-rose', SLOT_DATE, '06:30')] }) });
   try {
     const response = await POST(request({ ...slot, bookingUrl: 'javascript:alert(1)' }, '10.2.0.3'));
     assert.equal(response.status, 200);
     const json = await response.json();
-    assert.equal(json.bookingUrl, 'https://www.chronogolf.com/club/golf-sainte-rose?date=2099-07-10&nb_holes=18');
+    assert.equal(json.bookingUrl, `https://www.chronogolf.com/club/golf-sainte-rose?date=${SLOT_DATE}&nb_holes=18`);
     const sheet = new URL(fake.sheetCalls()[0]);
     assert.equal(sheet.searchParams.get('start_time'), '06:30');
     assert.equal(sheet.searchParams.get('end_time'), '06:30');
@@ -50,7 +54,7 @@ test('verify re-checks just that minute, fresh, and returns the official deep li
 });
 
 test('verify blocks a slot that disappeared or changed price', async () => {
-  for (const sheet of [[row('course-st-rose', '2099-07-10', '09:40')], [row('course-st-rose', '2099-07-10', '06:30', 95)]]) {
+  for (const sheet of [[row('course-st-rose', SLOT_DATE, '09:40')], [row('course-st-rose', SLOT_DATE, '06:30', 95)]]) {
     const fake = fakeChronogolf({ teetimes: () => Response.json({ status: 'open', teetimes: sheet }) });
     try {
       const response = await POST(request(slot, `10.2.1.${sheet[0].default_price.green_fee}`));

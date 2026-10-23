@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { formatPrice, formatTime12 } from "@/lib/format";
+import { getBookingProvider } from "@/lib/providers/config";
 import { readSlotRequest, verifyLiveTeeTime } from "@/lib/live-verification";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { emailConfigured } from "@/lib/email-config";
@@ -7,8 +8,8 @@ import { readJsonBody } from "@/lib/request-guard";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Per address, and per caller across all addresses so the route can't be
-// used to spray emails at many inboxes.
+// Per address (whoever asks), so one inbox can't be flooded from many IPs,
+// and per caller across all addresses, so one caller can't spray many inboxes.
 const emailLimiter = createRateLimiter(5, 15 * 60 * 1000);
 const callerLimiter = createRateLimiter(10, 60 * 60 * 1000);
 
@@ -27,6 +28,12 @@ function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
   );
+}
+
+/** The final step is always the provider's; Fairway never books. */
+function continueLabel(bookingUrl: string) {
+  const provider = getBookingProvider(bookingUrl);
+  return provider.id === "course" ? "Continue on the course site" : `Continue on ${provider.name}`;
 }
 
 function confirmationHtml(b: EmailDetails) {
@@ -52,7 +59,7 @@ function confirmationHtml(b: EmailDetails) {
         ⚠️ <b>This is not a booking confirmation.</b> Your spot isn't reserved until you
         complete it on the course's own page and receive <i>their</i> confirmation email.
       </div>
-      <a href="${escapeHtml(b.bookingUrl)}" style="display:block;margin-top:18px;background:#c6f24a;color:#08160d;text-align:center;padding:14px;border-radius:14px;font-weight:700;text-decoration:none">Book it on the course site →</a>
+      <a href="${escapeHtml(b.bookingUrl)}" style="display:block;margin-top:18px;background:#c6f24a;color:#08160d;text-align:center;padding:14px;border-radius:14px;font-weight:700;text-decoration:none">${escapeHtml(continueLabel(b.bookingUrl))} →</a>
       <p style="margin-top:16px;color:#9fb7a8;font-size:12px;line-height:1.5">
         We saved this for you so it's easy to finish. The course showed this slot as available a moment ago; availability and price are confirmed only by the course.
       </p>
@@ -111,7 +118,7 @@ export async function POST(request: Request) {
     );
   }
   const ip = clientIp(request);
-  if (callerLimiter(ip).limited || emailLimiter(`${ip}:${email.toLowerCase()}`).limited) {
+  if (callerLimiter(ip).limited || emailLimiter(email.toLowerCase()).limited) {
     return NextResponse.json(
       { error: "Too many email requests. Please try again later." },
       { status: 429 },

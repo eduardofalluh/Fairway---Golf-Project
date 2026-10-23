@@ -16,7 +16,7 @@ import {
   providerLoginUrlWithReturn,
 } from "@/lib/provider-callback";
 import { useProviderConnections } from "@/lib/useProviderConnections";
-import { connectionDaysLeft } from "@/lib/provider-connections";
+import { connectionDaysLeft, consumePendingSignIn, startPendingSignIn } from "@/lib/provider-connections";
 import { formatDaysAgo, useLanguage } from "@/lib/i18n";
 
 type ConnectableId = Exclude<BookingProviderId, "course">;
@@ -26,7 +26,8 @@ type ConnectableId = Exclude<BookingProviderId, "course">;
  * here so Fairway can remember (on this device only) that they signed in.
  */
 export function openProviderLogin(providerId: ConnectableId, href: string) {
-  const returnUrl = buildFairwayConnectionReturnUrl(providerId, href, window.location.href);
+  const nonce = startPendingSignIn(providerId);
+  const returnUrl = buildFairwayConnectionReturnUrl(providerId, href, window.location.href, nonce);
   window.open(providerLoginUrlWithReturn(providerId, href, returnUrl), "_blank", "noopener,noreferrer");
 }
 
@@ -184,7 +185,10 @@ export function BookingAccounts() {
   useEffect(() => {
     const callback = parseProviderConnectionCallback(window.location.href);
     if (!callback) return;
-    saveConnection(callback.providerId, callback.href);
+    // Only a return from a sign-in this browser started counts; crafted links don't.
+    if (consumePendingSignIn(callback.providerId, callback.nonce)) {
+      saveConnection(callback.providerId, callback.href);
+    }
     window.history.replaceState(window.history.state, "", cleanProviderConnectionCallbackUrl(window.location.href));
   }, [saveConnection]);
 

@@ -46,6 +46,8 @@ type Handler = (url: URL) => Response | undefined | Promise<Response | undefined
 export function fakeChronogolf(options: {
   clubs?: unknown[];
   teetimes?: (url: URL) => Response | Promise<Response>;
+  /** Let `teetimes` answer every page itself; otherwise pages after the first are empty, like the real API. */
+  paginate?: boolean;
   other?: Handler;
 }) {
   resetChronogolfStateForTests();
@@ -62,7 +64,10 @@ export function fakeChronogolf(options: {
       const uuids = CLUB_COURSES[decodeURIComponent(club[1])] ?? [];
       return Response.json({ courses: uuids.map((uuid) => ({ uuid })) });
     }
-    if (url.pathname === '/marketplace/v2/teetimes' && options.teetimes) return options.teetimes(url);
+    if (url.pathname === '/marketplace/v2/teetimes' && options.teetimes) {
+      if (!options.paginate && url.searchParams.get('page') !== '1') return Response.json({ status: 'open', teetimes: [] });
+      return options.teetimes(url);
+    }
     const other = await options.other?.(url);
     if (other) return other;
     throw new Error(`Unexpected fetch: ${url}`);

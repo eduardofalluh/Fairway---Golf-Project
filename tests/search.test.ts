@@ -129,6 +129,7 @@ test('a search asks only for the time window and batches clubs into shared reque
   };
   const fake = fakeChronogolf({
     clubs: [stRoseClub, dorvalClub],
+    paginate: true,
     teetimes: (url) => Response.json({ status: 'open', teetimes: pages[url.searchParams.get('page')!] ?? [] }),
   });
   try {
@@ -153,8 +154,8 @@ test('parts split the market so their union covers every live course once', asyn
   });
   try {
     const parts = await Promise.all([0, 1].map((part) => searchPart(range(750, 810, part, 2))));
-    const courses = parts.flatMap((p) => p.teeTimes.map((t) => t.courseId)).sort();
-    assert.deepEqual(courses, ['club-dorval', 'club-st-rose']);
+    const clubsPerPart = parts.map((p) => [...new Set(p.teeTimes.map((t) => t.courseId))]);
+    assert.deepEqual(clubsPerPart.flat().sort(), ['club-dorval', 'club-st-rose']);
     assert.ok(parts.every((p) => p.checkedCourses === 1));
   } finally {
     fake.restore();
@@ -180,6 +181,7 @@ test('a 429 marks Chronogolf as throttled and stops further calls until it clear
 
 test('a throttled later page keeps the rows already read and reports partial', async () => {
   const fake = fakeChronogolf({
+    paginate: true,
     teetimes: (url) => url.searchParams.get('page') === '1'
       ? Response.json({ status: 'open', teetimes: Array.from({ length: 24 }, () => row('course-st-rose', date, '12:30')) })
       : new Response('slow down', { status: 429, headers: { 'Retry-After': '60' } }),
@@ -409,4 +411,101 @@ test('the results heading never claims zero tee times when providers did not ans
   assert.equal(resultsHeadline({ ...base, visible: 4, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'count');
   // Rows that exist but can't be shown (stale or filtered) never turn a blocked search into "0 tee times".
   assert.equal(resultsHeadline({ ...base, visible: 0, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'blocked');
+});
+
+
+test('two courses at one club listing the same minute are both kept', async () => {
+  const fake = fakeChronogolf({
+    clubs: [dorvalClub],
+    teetimes: () => Response.json({ status: 'open', teetimes: [row('course-dorval-a', date, '08:00', 60), row('course-dorval-b', date, '08:00', 75)] }),
+  });
+  try {
+    const result = await searchPart(range(450, 510));
+    assert.deepEqual(result.teeTimes.map((t) => t.price).sort(), [60, 75]);
+    assert.equal(new Set(result.teeTimes.map((t) => t.id)).size, 2);
+  } finally {
+    fake.restore();
+  }
+});
+
+test('a sheet with more pages than the cap is reported partial, never complete', async () => {
+  const fake = fakeChronogolf({
+    paginate: true,
+    teetimes: (url) => Response.json({ status: 'open', teetimes: Array.from({ length: 24 }, (_, i) => row('course-st-rose', date, `0${6 + (Number(url.searchParams.get('page')) % 3)}:${String(i).padStart(2, '0')}`)) }),
+  });
+  try {
+    const result = await searchPart(range(360, 600));
+    assert.equal(result.providers.chronogolf?.status, 'partial');
+    assert.match(result.providers.chronogolf?.detail ?? '', /more than \d+ pages/);
+  } finally {
+    fake.restore();
+  }
+});
+
+test('a failed later page is never counted as a complete answer', async () => {
+  const fake = fakeChronogolf({
+    paginate: true,
+    teetimes: (url) => url.searchParams.get('page') === '1'
+      ? Response.json({ status: 'open', teetimes: Array.from({ length: 24 }, (_, i) => row('course-st-rose', date, `12:${String(i).padStart(2, '0')}`)) })
+      : new Response('blocked', { status: 403 }),
+  });
+  try {
+    const result = await searchPart(range(720, 840));
+    assert.equal(result.providers.chronogolf?.status, 'partial');
+    assert.equal(result.teeTimes.length, 24);
+  } finally {
+    fake.restore();
+  }
+});
+
+test('a failed or truncated course directory is reported, never treated as complete', async () => {
+  // Directory blocked outright: no Chronogolf courses, but the part must still say so.
+  let fake = fakeChronogolf({ teetimes: () => Response.json({ status: 'open', teetimes: [] }) });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).includes('/marketplace/v2/search') ? new Response('blocked', { status: 403 }) : realFetch(input, init)) as typeof fetch;
+  try {
+    const blocked = await searchPart(range());
+    assert.equal(blocked.providers.chronogolf?.status, 'unavailable');
+    assert.deepEqual(blocked.teeTimes, []);
+  } finally {
+    globalThis.fetch = realFetch;
+    fake.restore();
+  }
+  // Directory cut short: page 1 full, page 2 fails. Not cached, reported partial.
+  const fullPage = Array.from({ length: 25 }, (_, i) => ({ ...stRoseClub, uuid: `club-${i}`, name: `Club Number ${i}`, slug: `club-${i}` }));
+  fake = fakeChronogolf({ clubs: fullPage });
+  const fakeFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes('/marketplace/v2/search') && url.includes('page=2')) return new Response('down', { status: 503 });
+    return fakeFetch(input, init);
+  }) as typeof fetch;
+  try {
+    const { getChronogolfDirectory } = await import('../src/lib/providers/chronogolf');
+    const first = await getChronogolfDirectory('montreal');
+    assert.equal(first.state.status, 'partial');
+    assert.equal(first.courses.length, 25);
+    // Page 2 now answers (empty, i.e. the end): the partial list must not have been cached.
+    globalThis.fetch = fakeFetch;
+    const again = await getChronogolfDirectory('montreal');
+    assert.equal(again.state.status, 'ok', 'the partial list was not cached as complete');
+  } finally {
+    fake.restore();
+  }
+});
+
+test('/api/courses only lets the CDN keep a fully read directory', async () => {
+  const { GET: courses } = await import('../src/app/api/courses/route');
+  const fake = fakeChronogolf({});
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).includes('/marketplace/v2/search') ? new Response('blocked', { status: 403 }) : realFetch(input, init)) as typeof fetch;
+  try {
+    const res = await courses(new Request('http://localhost/api/courses?market=montreal'));
+    assert.equal(res.headers.get('Cache-Control'), 'no-store');
+  } finally {
+    globalThis.fetch = realFetch;
+    fake.restore();
+  }
 });
