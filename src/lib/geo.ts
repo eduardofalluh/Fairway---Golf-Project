@@ -61,9 +61,10 @@ const NORTH_SHORE_CITIES = ["mirabel", "saint janvier", "terrebonne", "lorraine"
 const TORONTO_CORE_CITIES = ["toronto", "north york", "scarborough", "etobicoke", "east york", "york"];
 const EAST_GTA_CITIES = ["ajax", "pickering", "whitby", "oshawa", "uxbridge", "brooklin", "clarington", "bowmanville"];
 const WEST_GTA_CITIES = ["mississauga", "oakville", "burlington"];
-const PEEL_HALTON_CITIES = ["brampton", "caledon", "caledon east", "milton", "halton hills", "georgetown"];
+const PEEL_HALTON_CITIES = ["brampton", "caledon", "caledon east", "milton", "halton hills", "georgetown", "mono", "orangeville"];
 const NORTH_GTA_CITIES = ["markham", "richmond hill", "vaughan", "maple", "aurora", "newmarket", "stouffville", "whitchurch stouffville", "king city", "king", "woodbridge", "kleinburg"];
-const HAMILTON_NIAGARA_CITIES = ["hamilton", "ancaster", "dundas", "stoney creek", "grimsby", "niagara", "niagara falls", "welland", "st catharines"];
+// Matched against `normalizedCity`, which spells "St." as "saint".
+const HAMILTON_NIAGARA_CITIES = ["hamilton", "ancaster", "dundas", "stoney creek", "grimsby", "niagara", "niagara falls", "welland", "saint catharines", "fort erie", "wainfleet", "west lincoln", "lincoln", "pelham", "thorold", "port colborne"];
 const normalizedCity = (city: string) => city.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\bst\b/g, "saint").replace(/\bste\b/g, "sainte");
 
 /**
@@ -87,6 +88,8 @@ export function classifyRegion(
     if (WEST_GTA_CITIES.some((x) => c === x || c.includes(x))) return "West GTA";
     if (HAMILTON_NIAGARA_CITIES.some((x) => c === x || c.includes(x))) return "Hamilton/Niagara";
 
+    // South of Hamilton's shoreline is the Niagara peninsula, across the lake.
+    if (lat < 43.3) return "Hamilton/Niagara";
     if (lng < -79.55 && lat < 43.8) return "Peel/Halton";
     if (lng < -79.65) return "West GTA";
     if (lng > -79.15) return "East GTA";

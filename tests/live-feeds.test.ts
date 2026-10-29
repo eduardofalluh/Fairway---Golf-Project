@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getDirectory, searchPart } from '../src/lib/aggregator';
+import { EXTRA_COURSES } from '../src/lib/courses';
 import { deepBookingUrl } from '../src/lib/booking-links';
 import { addDaysISO, todayISO } from '../src/lib/format';
 import { hasLiveFeed } from '../src/lib/live-feed';
@@ -174,12 +175,13 @@ test('a Toronto search part merges Jonas and TeeItUp rows with their own provide
     const jonasRows = part.teeTimes.filter((r) => r.id.includes('-jonas-'));
     const teeItUpRows = part.teeTimes.filter((r) => r.id.includes('-teeitup-'));
     assert.deepEqual(new Set(jonasRows.map((r) => r.courseId)), new Set(['extra-watsons-glen', 'extra-copper-creek']));
-    assert.equal(teeItUpRows.length, 2);
+    const teeItUpCourses = EXTRA_COURSES.filter((c) => c.market === 'toronto' && c.source === 'teeitup');
+    assert.equal(teeItUpRows.length, teeItUpCourses.length);
     assert.equal(teeItUpRows[0].time, '14:10');
     assert.match(teeItUpRows[0].bookingUrl, new RegExp(`\\.book\\.teeitup\\.golf/\\?date=${date}$`));
     // One sheet call per Jonas club, and a facility list plus one sheet call per TeeItUp course.
     assert.equal(fake.calls.filter((c) => c.includes('clubhouseonline-e3.net')).length, 2);
-    assert.equal(fake.calls.filter((c) => c.includes('kenna.io')).length, 4);
+    assert.equal(fake.calls.filter((c) => c.includes('kenna.io')).length, 2 * teeItUpCourses.length);
   } finally {
     fake.restore();
   }

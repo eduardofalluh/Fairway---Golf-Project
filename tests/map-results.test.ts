@@ -20,6 +20,11 @@ test('region filters recognize river geography and local city spellings', () => 
   assert.equal(classifyRegion('montreal','Île-Bizard',45.5,-73.9),'Montreal Island');
   assert.equal(classifyRegion('toronto','Scarborough',43.77,-79.3),'Toronto Core');
   assert.equal(classifyRegion('toronto','Pickering',43.88,-79.08),'East GTA');
+  assert.equal(classifyRegion('toronto','St. Catharines',43.13,-79.31),'Hamilton/Niagara');
+  assert.equal(classifyRegion('toronto','Fort Erie',42.95,-79.03),'Hamilton/Niagara');
+  // An unlisted town across the lake still lands in Niagara, not Toronto Core.
+  assert.equal(classifyRegion('toronto','Ridgeville',43.05,-79.3),'Hamilton/Niagara');
+  assert.equal(classifyRegion('toronto','Mono',43.94,-80.05),'Peel/Halton');
   assert.equal(classifyRegion('toronto','Brampton',43.73,-79.65),'Peel/Halton');
   assert.equal(classifyRegion('toronto','Maple',43.89,-79.52),'North GTA');
 });
