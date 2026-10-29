@@ -2,7 +2,6 @@ import type { GolfCourse, ProviderId, ProviderState, TeeTime } from "../types";
 import { fetchChronogolfWindow } from "./chronogolf";
 import { fetchJonasWindow } from "./jonas";
 import { fetchTeeItUpWindow } from "./teeitup";
-import { fetchTeeTimeWindow } from "./teetime";
 
 /** Live rows inside [startMin, endMin] for a provider's courses, and how it answered. */
 export type WindowFetcher = (
@@ -20,7 +19,6 @@ export type WindowFetcher = (
  */
 export const LIVE_FEEDS: Record<ProviderId, WindowFetcher> = {
   chronogolf: fetchChronogolfWindow,
-  teetime: fetchTeeTimeWindow,
   jonas: fetchJonasWindow,
   teeitup: fetchTeeItUpWindow,
 };

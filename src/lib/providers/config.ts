@@ -137,14 +137,6 @@ export const PROVIDER_ACCOUNT_LINKS = [
       "Live tee times come from Chronogolf when its course sheet is open. Sign in there before you finish booking.",
   },
   {
-    id: "teetime" as const,
-    name: "TeeTime",
-    href: "https://tee-time.com/login",
-    action: "Sign in on TeeTime",
-    description:
-      "Toronto live tee times can come from TeeTime clubs. Sign in there before you finish booking.",
-  },
-  {
     id: "golfthe6ix" as const,
     name: "Golf the 6ix",
     href: "https://app.golfthe6ix.com/",

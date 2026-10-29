@@ -4,7 +4,6 @@ import { parseRangeQuery } from '../src/lib/search-query';
 import { missingRanges } from '../src/lib/useTeeTimeSearch';
 import { searchPart } from '../src/lib/aggregator';
 import { fetchChronogolfWindow, parseBatchResponse, parseTeetimesResponse } from '../src/lib/providers/chronogolf';
-import { fetchTeeTimeCourseTeeTimes } from '../src/lib/providers/teetime';
 import { filterTeeTimes, groupByCourse, mergeProviderStates, timeBuckets } from '../src/lib/results';
 import { GET } from '../src/app/api/tee-times/route';
 import { addDaysISO, todayISO } from '../src/lib/format';
@@ -250,55 +249,6 @@ test('preserves cents and rejects unavailable or mismatched live inventory', () 
   ] });
   assert.equal(rows.length, 1); assert.equal(rows[0].price, 55.75);
 });
-test('TeeTime pages parse into live GTA tee times', async () => {
-  const originalFetch = globalThis.fetch;
-  const torontoCourse: GolfCourse = {
-    id: 'extra-pickering-glen-golf-club',
-    market: 'toronto',
-    name: 'Pickering Glen Golf Club',
-    city: 'Pickering',
-    region: 'East GTA',
-    holes: [18],
-    distanceKm: 36,
-    lat: 43.921,
-    lng: -79.1859,
-    source: 'teetime',
-    teeTimeSlug: 'pickering-glen-golf-club',
-    online: true,
-    access: 'public',
-    bookingUrl: 'https://tee-time.com/clubs/pickering-glen-golf-club',
-  };
-  const payload = {
-    props: {
-      organization: {
-        availabilities: {
-          '1304': {
-            holes: '18',
-            priceFrom: 80,
-            group_size: '2',
-            teeTimes: [
-              { id: 123, course: 'Pickering', date: '2099-07-10 00:00:00', time: 1304, holes: 18, cart_mandatory: false, price: 80, group_size: 2 },
-            ],
-          },
-        },
-      },
-    },
-  };
-  globalThis.fetch = (async () => new Response(
-    `<div id="app" data-page="${JSON.stringify(payload).replaceAll('"', '&quot;')}"></div>`,
-    { status: 200, headers: { 'content-type': 'text/html' } },
-  )) as typeof fetch;
-  try {
-    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, date);
-    assert.equal(rows?.length, 1);
-    assert.equal(rows?.[0].source, 'live');
-    assert.equal(rows?.[0].time, '13:04');
-    assert.equal(rows?.[0].price, 80);
-    assert.equal(rows?.[0].players, 2);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
 test('Chronogolf parser rejects blocked, member-only or vague rows before they become tee-time cards', () => {
   const base = { start_time: '06:30', date: date, max_player_size: 4, default_price: { green_fee: 48, bookable_holes: 18 } };
   const rows = parseTeetimesResponse(course, date, { status: 'open', teetimes: [
@@ -323,60 +273,6 @@ test('Chronogolf parser can require the returned course uuid to match the search
   ] }, new Set(['course-a']));
   assert.equal(rows.length, 1);
   assert.equal(rows[0].time, '09:10');
-});
-
-test('TeeTime pages require exact row-level date, price, capacity and holes', async () => {
-  const originalFetch = globalThis.fetch;
-  const torontoCourse: GolfCourse = {
-    id: 'extra-test-teetime-club',
-    market: 'toronto',
-    name: 'Test TeeTime Club',
-    city: 'Toronto',
-    region: 'Toronto Core',
-    holes: [18],
-    distanceKm: 10,
-    lat: 43.7,
-    lng: -79.4,
-    source: 'teetime',
-    teeTimeSlug: 'test-teetime-club',
-    online: true,
-    access: 'public',
-    bookingUrl: 'https://tee-time.com/clubs/test-teetime-club',
-  };
-  const payload = {
-    props: {
-      organization: {
-        availabilities: {
-          '0630': {
-            holes: '18',
-            priceFrom: 48,
-            group_size: '4',
-            teeTimes: [
-              { id: 'no-date', time: 630, holes: 18, price: 48, group_size: 4 },
-              { id: 'wrong-date', date: '2099-07-11 00:00:00', time: 630, holes: 18, price: 48, group_size: 4 },
-              { id: 'bucket-price-only', date: '2099-07-10 00:00:00', time: 630, holes: 18, group_size: 4 },
-              { id: 'bucket-size-only', date: '2099-07-10 00:00:00', time: 630, holes: 18, price: 48 },
-              { id: 'bucket-holes-only', date: '2099-07-10 00:00:00', time: 630, price: 48, group_size: 4 },
-              { id: 'exact', date: '2099-07-10 00:00:00', time: 650, holes: 18, price: 92, group_size: 3 },
-            ],
-          },
-        },
-      },
-    },
-  };
-  globalThis.fetch = (async () => new Response(
-    `<div id="app" data-page="${JSON.stringify(payload).replaceAll('"', '&quot;')}"></div>`,
-    { status: 200, headers: { 'content-type': 'text/html' } },
-  )) as typeof fetch;
-  try {
-    const rows = await fetchTeeTimeCourseTeeTimes(torontoCourse, date);
-    assert.equal(rows?.length, 1);
-    assert.equal(rows?.[0].id.includes('exact'), true);
-    assert.equal(rows?.[0].price, 92);
-    assert.equal(rows?.[0].players, 3);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
 });
 
 test("Chronogolf's own demo listings never appear as courses", async () => {
@@ -411,9 +307,9 @@ test('the results heading never claims zero tee times when providers did not ans
   assert.equal(resultsHeadline({ ...base, error: 'busy' }), 'paused');
   assert.equal(resultsHeadline({ ...base, status: 'error', error: 'service' }), 'error');
   assert.equal(resultsHeadline({ ...base, status: 'loading', providers: { chronogolf: { status: 'unavailable' } } }), 'count');
-  assert.equal(resultsHeadline({ ...base, visible: 4, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'count');
+  assert.equal(resultsHeadline({ ...base, visible: 4, providers: { chronogolf: { status: 'unavailable' }, jonas: { status: 'ok' } } }), 'count');
   // Rows that exist but can't be shown (stale or filtered) never turn a blocked search into "0 tee times".
-  assert.equal(resultsHeadline({ ...base, visible: 0, providers: { chronogolf: { status: 'unavailable' }, teetime: { status: 'ok' } } }), 'blocked');
+  assert.equal(resultsHeadline({ ...base, visible: 0, providers: { chronogolf: { status: 'unavailable' }, jonas: { status: 'ok' } } }), 'blocked');
 });
 
 

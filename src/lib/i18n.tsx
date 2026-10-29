@@ -230,7 +230,6 @@ export const copy: Record<Language, Copy> = {
       connectedCount: (n) => (n === 0 ? "None marked yet" : `${plural(n, "app", "apps")} marked signed in on this device`),
       scope: {
         chronogolf: "Québec + Ontario",
-        teetime: "Toronto + GTA",
         golfthe6ix: "City of Toronto",
         golfnow: "Toronto + GTA",
         minutegolf: "Québec clubs",
@@ -238,7 +237,6 @@ export const copy: Record<Language, Copy> = {
       },
       description: {
         chronogolf: "Most live tee times on Fairway book through Chronogolf.",
-        teetime: "GTA clubs with live TeeTime sheets.",
         golfthe6ix: "Booking for the City of Toronto's courses.",
         golfnow: "GolfNow's network of GTA courses.",
         minutegolf: "MinuteGolf member access for Québec clubs.",
@@ -344,7 +342,7 @@ export const copy: Record<Language, Copy> = {
       tryWider: "Widen to ± 2 hr",
       tryTomorrow: "Try the next day",
       clearFilters: "Clear filters",
-      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime", jonas: "Jonas", teeitup: "TeeItUp" },
+      providerName: { chronogolf: "Chronogolf", jonas: "Jonas", teeitup: "TeeItUp" },
       providerBusy: (p, s) => `${p} asked us to slow down${s ? ` — try again in about ${s}s` : ""}. Showing everything we could check.`,
       providerPartial: (p) => `Some ${p} courses didn't answer in time, so a few tee times may be missing.`,
       providerDown: (p) => `${p} isn't sharing live times with this site right now. Its courses are listed below with their own booking pages.`,
@@ -420,7 +418,7 @@ export const copy: Record<Language, Copy> = {
       faqIntro: "Fairway finds and compares tee times. The course or its booking provider takes the reservation and payment.",
       faqs: [
         { q: "Are these tee times real?", a: "Yes. Fairway only shows slots that a provider's live tee sheet lists right now, and re-checks your pick before sending you on. Nothing is estimated." },
-        { q: "Where does availability come from?", a: "Chronogolf for most Québec and Ontario courses, plus TeeTime clubs in the GTA. Courses that use other systems appear as direct links to their own booking page." },
+        { q: "Where does availability come from?", a: "Chronogolf for most Québec and Ontario courses, plus clubs on TeeItUp and Jonas tee sheets in the GTA. Courses that use other systems appear as direct links to their own booking page or phone line." },
         { q: "Why is a course missing or a time gone?", a: "Most courses open their sheets a few days ahead, and popular times go fast. If a provider is busy, Fairway shows what it could check and tells you." },
         { q: "Does Fairway take payment?", a: "No. You confirm and pay on the course's booking page, and the course sends your confirmation." },
       ],
@@ -453,7 +451,6 @@ export const copy: Record<Language, Copy> = {
       connectedCount: (n) => (n === 0 ? "Aucune appli marquée pour l’instant" : `${plural(n, "appli marquée", "applis marquées")} comme connectée${n > 1 ? "s" : ""} sur cet appareil`),
       scope: {
         chronogolf: "Québec + Ontario",
-        teetime: "Toronto + RGT",
         golfthe6ix: "Ville de Toronto",
         golfnow: "Toronto + RGT",
         minutegolf: "Clubs du Québec",
@@ -461,7 +458,6 @@ export const copy: Record<Language, Copy> = {
       },
       description: {
         chronogolf: "La plupart des départs en direct sur Fairway se réservent avec Chronogolf.",
-        teetime: "Clubs de la RGT avec feuilles TeeTime en direct.",
         golfthe6ix: "Réservation des parcours de la Ville de Toronto.",
         golfnow: "Le réseau de parcours GolfNow dans la RGT.",
         minutegolf: "Accès membre MinuteGolf pour les clubs du Québec.",
@@ -567,7 +563,7 @@ export const copy: Record<Language, Copy> = {
       tryWider: "Élargir à ± 2 h",
       tryTomorrow: "Essayer le lendemain",
       clearFilters: "Effacer les filtres",
-      providerName: { chronogolf: "Chronogolf", teetime: "TeeTime", jonas: "Jonas", teeitup: "TeeItUp" },
+      providerName: { chronogolf: "Chronogolf", jonas: "Jonas", teeitup: "TeeItUp" },
       providerBusy: (p, s) => `${p} nous demande de ralentir${s ? ` — réessayez dans environ ${s} s` : ""}. Voici tout ce qu’on a pu vérifier.`,
       providerPartial: (p) => `Certains parcours ${p} n’ont pas répondu à temps; quelques départs peuvent manquer.`,
       providerDown: (p) => `${p} ne partage pas ses départs en direct avec ce site pour le moment. Ses parcours sont listés plus bas avec leur propre page de réservation.`,
@@ -643,7 +639,7 @@ export const copy: Record<Language, Copy> = {
       faqIntro: "Fairway trouve et compare les départs. Le parcours ou son fournisseur prend la réservation et le paiement.",
       faqs: [
         { q: "Ces départs sont-ils réels?", a: "Oui. Fairway affiche seulement les créneaux qu’une feuille de départ en direct liste en ce moment, et revérifie votre choix avant de vous rediriger. Rien n’est estimé." },
-        { q: "D’où vient la disponibilité?", a: "De Chronogolf pour la plupart des parcours du Québec et de l’Ontario, et des clubs TeeTime dans la RGT. Les parcours sur d’autres systèmes apparaissent comme liens directs vers leur page de réservation." },
+        { q: "D’où vient la disponibilité?", a: "De Chronogolf pour la plupart des parcours du Québec et de l’Ontario, et des clubs sur TeeItUp et Jonas dans la RGT. Les parcours sur d’autres systèmes apparaissent comme liens directs vers leur page de réservation ou leur numéro de téléphone." },
         { q: "Pourquoi un parcours ou une heure manque-t-il?", a: "La plupart des parcours ouvrent leurs feuilles quelques jours d’avance et les bonnes heures partent vite. Si un fournisseur est occupé, Fairway affiche ce qu’il a pu vérifier et vous le dit." },
         { q: "Fairway prend-il le paiement?", a: "Non. Vous confirmez et payez sur la page de réservation du parcours, qui vous envoie la confirmation." },
       ],

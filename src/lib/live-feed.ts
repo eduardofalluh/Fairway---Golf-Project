@@ -9,8 +9,6 @@ export function hasLiveFeed(course: GolfCourse): course is GolfCourse & { source
   switch (course.source) {
     case "chronogolf":
       return Boolean(course.chronogolfSlug);
-    case "teetime":
-      return Boolean(course.teeTimeSlug);
     case "jonas":
       return Boolean(course.jonas);
     case "teeitup":

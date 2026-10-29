@@ -3,8 +3,8 @@ import type { GolfCourse } from "./types";
 /**
  * Deep link straight to the course's booking page, pre-set to the chosen date
  * and round length so the golfer lands on their exact tee-off ready to book.
- * Chronogolf honours `?date=` and `?nb_holes=`. TeeTime and TeeItUp honour
- * `?date=`. Other providers keep their official handoff URL.
+ * Chronogolf honours `?date=` and `?nb_holes=`; TeeItUp honours `?date=`.
+ * Other providers keep their official handoff URL.
  */
 export function deepBookingUrl(
   course: GolfCourse,
@@ -14,9 +14,6 @@ export function deepBookingUrl(
   if (course.source === "chronogolf" && course.chronogolfSlug) {
     const nb = holes >= 18 ? 18 : holes;
     return `https://www.chronogolf.com/club/${course.chronogolfSlug}?date=${date}&nb_holes=${nb}`;
-  }
-  if (course.source === "teetime" && course.teeTimeSlug) {
-    return `https://tee-time.com/clubs/${course.teeTimeSlug}?date=${date}`;
   }
   if (course.source === "teeitup" && course.teeItUpAlias) {
     return `https://${course.teeItUpAlias}.book.teeitup.golf/?date=${date}`;

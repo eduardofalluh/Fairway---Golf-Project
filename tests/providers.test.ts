@@ -27,7 +27,7 @@ test('provider capabilities never imply unconfigured account linkage or booking'
   }
 });
 test('provider account cards include central Toronto provider logins', () => {
-  for (const id of ['chronogolf', 'teetime', 'golfthe6ix', 'golfnow'] as const) {
+  for (const id of ['chronogolf', 'golfthe6ix', 'golfnow'] as const) {
     const card = PROVIDER_ACCOUNT_LINKS.find((provider) => provider.id === id);
     assert.ok(card?.href);
     assert.equal(getBookingProvider(card.href).id, id);

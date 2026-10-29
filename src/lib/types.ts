@@ -71,8 +71,6 @@ export interface GolfCourse {
   /** Chronogolf identifiers (present when source === "chronogolf"). */
   chronogolfUuid?: string;
   chronogolfSlug?: string;
-  /** TeeTime slug (present when source === "teetime"). */
-  teeTimeSlug?: string;
   /** Jonas ClubHouse Online host and course id (present when source === "jonas"). */
   jonas?: { host: string; courseId: number };
   /** TeeItUp booking alias, the `<alias>.book.teeitup.golf` subdomain (source === "teeitup"). */
@@ -160,7 +158,7 @@ export interface SearchFilters {
 }
 
 /** Booking systems Fairway reads live tee sheets from. */
-export type ProviderId = "chronogolf" | "teetime" | "jonas" | "teeitup";
+export type ProviderId = "chronogolf" | "jonas" | "teeitup";
 
 /**
  * ok = every sheet answered; partial = some sheets answered; throttled = the

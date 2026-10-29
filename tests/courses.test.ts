@@ -23,7 +23,7 @@ test('every curated course can be booked: an HTTPS page, a phone line or a live 
 });
 
 test('curated live courses hand off to the provider they are read from', () => {
-  const expected = { teetime: 'teetime', jonas: 'jonas', teeitup: 'teeitup' } as const;
+  const expected = { jonas: 'jonas', teeitup: 'teeitup' } as const;
   for (const c of EXTRA_COURSES) {
     if (c.source === 'extra' || c.source === 'chronogolf') continue;
     assert.equal(getBookingProvider(c.bookingUrl).id, expected[c.source], `${c.name} booking host`);

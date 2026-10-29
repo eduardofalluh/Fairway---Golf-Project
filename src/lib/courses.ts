@@ -6,9 +6,8 @@ export { MARKET_REGIONS, REGIONS } from "./types";
 /**
  * Curated public courses outside the primary Chronogolf directory. Montréal
  * entries cover GGGolf clubs (whose public tee sheets Fairway links to) and
- * courses that only book by phone. Toronto entries add live TeeTime, Jonas and
- * TeeItUp clubs plus official booking pages for municipal and regional
- * systems. A curated entry also replaces a Chronogolf listing of the same name
+ * courses that only book by phone. Toronto entries add live Jonas and TeeItUp
+ * clubs plus official booking pages for municipal and regional systems. A curated entry also replaces a Chronogolf listing of the same name
  * that has no online booking there. Private member clubs are left out.
  */
 interface ExtraSeed {
@@ -16,7 +15,6 @@ interface ExtraSeed {
   source?: GolfCourse["source"];
   online?: boolean;
   slug: string;
-  teeTimeSlug?: string;
   jonas?: GolfCourse["jonas"];
   teeItUpAlias?: string;
   phone?: string;
@@ -366,67 +364,16 @@ const EXTRA_SEEDS: ExtraSeed[] = [
   },
   {
     market: "toronto",
-    source: "teetime",
-    teeTimeSlug: "pickering-glen-golf-club",
-    slug: "pickering-glen-golf-club",
+    slug: "pickering-glen",
     name: "Pickering Glen Golf Club",
     city: "Pickering",
     holes: [18],
     lat: 43.921,
     lng: -79.1859,
-    weekday: 80,
-    weekend: 92,
-    bookingUrl: "https://tee-time.com/clubs/pickering-glen-golf-club",
+    // Formerly Glen Cedars, which Chronogolf lists without online booking.
+    bookingUrl: "https://www.golfnow.com/tee-times/facility/14426-pickering-glen-golf-club/search",
     access: "public",
-    blurb: "GTA east public tee times with live inventory through TeeTime.",
-  },
-  {
-    market: "toronto",
-    source: "teetime",
-    teeTimeSlug: "kirby-links-golf-course",
-    slug: "kirby-links-golf-course",
-    name: "Kirby Links Golf Course",
-    city: "Maple",
-    holes: [18],
-    lat: 43.8904,
-    lng: -79.5284,
-    weekday: 26,
-    weekend: 45,
-    bookingUrl: "https://tee-time.com/clubs/kirby-links-golf-course",
-    access: "public",
-    blurb: "North GTA public course with live TeeTime inventory.",
-  },
-  {
-    market: "toronto",
-    source: "teetime",
-    teeTimeSlug: "lionhead-golf-club-conference-centre",
-    slug: "lionhead-golf-club-conference-centre",
-    name: "Lionhead Golf Club & Conference Centre",
-    city: "Brampton",
-    holes: [18, 18],
-    lat: 43.6279,
-    lng: -79.7762,
-    weekday: 100,
-    weekend: 130,
-    bookingUrl: "https://tee-time.com/clubs/lionhead-golf-club-conference-centre",
-    access: "public",
-    blurb: "Two GTA west courses with live TeeTime inventory.",
-  },
-  {
-    market: "toronto",
-    source: "teetime",
-    teeTimeSlug: "royal-ontario-golf-club",
-    slug: "royal-ontario-golf-club",
-    name: "Royal Ontario Golf Club",
-    city: "Milton",
-    holes: [18],
-    lat: 43.5409,
-    lng: -79.7972,
-    weekday: 110,
-    weekend: 135,
-    bookingUrl: "https://tee-time.com/clubs/royal-ontario-golf-club",
-    access: "public",
-    blurb: "Milton public tee times with live inventory through TeeTime.",
+    blurb: "Public 18 in north Pickering, formerly Glen Cedars; books through GolfNow.",
   },
   {
     market: "toronto",
@@ -840,7 +787,6 @@ export const EXTRA_COURSES: GolfCourse[] = EXTRA_SEEDS.map((e) => ({
   lat: e.lat,
   lng: e.lng,
   source: e.source ?? "extra",
-  teeTimeSlug: e.teeTimeSlug,
   jonas: e.jonas,
   teeItUpAlias: e.teeItUpAlias,
   phone: e.phone,
